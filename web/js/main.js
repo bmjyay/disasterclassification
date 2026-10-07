@@ -7,9 +7,16 @@
   const IMAGERY_URL = (x, y, l) =>
     `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${l}/${y}/${x}`;
   const IMAGERY_CREDIT = "Imagery © Esri, Maxar, Earthstar Geographics";
-  const EARTH_TEXTURE = TEX + "earth-blue-marble.jpg";
-  // Darkens the Blue Marble texture for a matte, less saturated planet.
-  const GLOBE_TINT = 0.8;
+  // Water mask (water = white, land = black) used to place the land particles.
+  const LAND_MASK = TEX + "earth-water.png";
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+  let particleZoom = 1;
+  const PARTICLE_STYLE = {
+    landBright: { color: "rgba(214,226,228,0.95)", size: 1.7 },
+    landDim:    { color: "rgba(150,170,174,0.7)",  size: 1.2 },
+    ocean:      { color: "rgba(118,138,144,0.35)", size: 1.0 },
+    shell:      { color: "rgba(170,186,190,0.28)", size: 1.0 },
+  };
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const flyMs = (ms) => (reduceMotion ? 0 : ms);
 
@@ -104,12 +111,16 @@
   // ── Globe ────────────────────────────────────────────────────────────────
   const globeEl = document.getElementById("globe");
   const world = Globe({ animateIn: false })(globeEl)
-    .globeImageUrl(EARTH_TEXTURE)
-    .bumpImageUrl(TEX + "earth-topology.png")
-    .backgroundColor("#070708")
-    .atmosphereColor("#9fb0bf")
-    .atmosphereAltitude(0.12)
-    .onGlobeReady(() => requestAnimationFrame(() => requestAnimationFrame(runIntro)))
+    .backgroundColor("#060708")
+    .atmosphereColor("#8fa3a8")
+    .atmosphereAltitude(0.09)
+    .particlesData([])
+    .particlesList("points")
+    .particleLat((p) => p[0]).particleLng((p) => p[1]).particleAltitude((p) => p[2])
+    .particlesSize((d) => PARTICLE_STYLE[d.kind].size * DPR * particleZoom)
+    .particlesSizeAttenuation(false)
+    .particlesColor((d) => PARTICLE_STYLE[d.kind].color)
+    .particleLabel(() => "")
     .htmlElementsData([])
     .htmlLat("lat").htmlLng("lng").htmlAltitude("alt")
     .htmlElement((d) => d.el)
@@ -129,19 +140,15 @@
     .ringPropagationSpeed((d) => d.speed)
     .ringRepeatPeriod((d) => d.period)
     .onGlobeClick(({ lat, lng }) => onGround(lat, lng))
-    .onZoom(updateAttribution);
+    .onZoom(syncSurface);
 
   world.renderer().setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-  // Matte surface: dim the texture, kill the specular highlight, soften the fill light.
+  // A near-black, matte sphere; the planet itself is drawn by particles.
   const globeMat = world.globeMaterial();
-  globeMat.color.setRGB(GLOBE_TINT, GLOBE_TINT, GLOBE_TINT * 1.02);
-  if (globeMat.specular) globeMat.specular.setRGB(0.04, 0.04, 0.04);
-  globeMat.shininess = 2;
-  globeMat.bumpScale = 3;
-  for (const light of world.lights()) {
-    if (light.isAmbientLight) light.intensity *= 0.6;
-  }
+  globeMat.color.setRGB(0.004, 0.005, 0.006);
+  if (globeMat.specular) globeMat.specular.setRGB(0.02, 0.02, 0.02);
+  globeMat.shininess = 1;
   const controls = world.controls();
   controls.enableZoom = false;
   controls.autoRotate = !reduceMotion;
@@ -199,6 +206,7 @@
 
   function refreshHtml() {
     const items = [];
+    // The opening view shows only the orbit web; satellites appear once the story starts.
     if (state.chapter !== "hero" || state.exploring) items.push(...visibleSats());
     if (siteMarker.active) items.push(siteMarker);
     if (state.clickedPoint) items.push(pinMarker);
@@ -213,13 +221,25 @@
 
   function refreshPaths(date) {
     const paths = [];
+    if (!state.selected && !state.highlight && state.chapter !== null) {
+      // A faint web of every orbit, the planet's "wiring diagram".
+      const seen = new Set();
+      for (const d of visibleSats()) {
+        const key = d.sat.geo ? "geo" : `${d.sat.alt}|${d.sat.inc}|${d.sat.raan}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        paths.push({ pts: O.orbitPath(d.sat, date), color: "rgba(190,205,208,0.15)", stroke: null });
+      }
+      world.pathsData(paths);
+      return;
+    }
     const tracked = state.selected
       ? [state.selected]
-      : state.highlight ? sats.filter((d) => state.highlight.has(d.sat.id)) : [];
+      : sats.filter((d) => state.highlight.has(d.sat.id));
     for (const d of tracked) {
       if (state.hiddenCats.has(d.sat.cat)) continue;
       const color = O.CATEGORIES[d.sat.cat].color;
-      paths.push({ pts: O.orbitPath(d.sat, date), color: hexA(color, 0.35), stroke: 0.4 });
+      paths.push({ pts: O.orbitPath(d.sat, date), color: hexA(color, 0.5), stroke: null });
     }
     if (state.selected) {
       const d = state.selected;
@@ -461,8 +481,7 @@
     exploreUi.setAttribute("aria-hidden", "true");
     controls.enableZoom = false;
     closeInfo();
-    world.globeTileEngineUrl(null);
-    updateAttribution();
+    syncSurface();
     layout();
     window.scrollTo(0, storyScroll);
     const name = state.chapter;
@@ -499,37 +518,58 @@
     applyImagery();
   });
 
-  // Probe one imagery tile first so a blocked tile server falls back to the texture.
+  // Probe one imagery tile first so a blocked tile server keeps the particle globe.
   function applyImagery() {
     if (!state.exploring) return;
-    if (!state.useImagery) { world.globeTileEngineUrl(null); updateAttribution(); return; }
-    if (state.imageryOk === true) { world.globeTileEngineUrl(IMAGERY_URL); updateAttribution(); return; }
-    if (state.imageryOk === false) return;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => { state.imageryOk = true; applyImagery(); };
-    img.onerror = () => {
-      state.imageryOk = false;
-      imageryToggle.checked = false;
-      imageryToggle.disabled = true;
-      imageryToggle.parentElement.title = "Imagery server unreachable; showing the Blue Marble texture";
-    };
-    img.src = IMAGERY_URL(0, 0, 0);
+    if (state.useImagery && state.imageryOk === null) {
+      state.imageryOk = "pending";
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => { state.imageryOk = true; syncSurface(); };
+      img.onerror = () => {
+        state.imageryOk = false;
+        imageryToggle.checked = false;
+        imageryToggle.disabled = true;
+        imageryToggle.parentElement.title = "Imagery server unreachable; showing the particle globe";
+      };
+      img.src = IMAGERY_URL(0, 0, 0);
+    }
+    syncSurface();
+  }
+
+  /* From afar the planet is particles; zoomed in while exploring it switches to
+   * photographic tiles (with hysteresis so it doesn't flicker at the threshold). */
+  function syncSurface() {
+    const alt = world.pointOfView().altitude;
+    // Grow the dots as the camera closes in so the land stays solid.
+    const z = Math.min(2.6, Math.max(1, 1.6 / Math.sqrt(alt)));
+    if (Math.abs(z - particleZoom) > 0.05) {
+      particleZoom = z;
+      world.particlesSize(world.particlesSize());
+    }
+    const want = state.exploring && state.useImagery && state.imageryOk === true &&
+      alt < (state.tilesOn ? 1.15 : 0.9);
+    if (want !== !!state.tilesOn) {
+      state.tilesOn = want;
+      world.globeTileEngineUrl(want ? IMAGERY_URL : null);
+      setParticles(want ? [] : particleSets);
+      document.body.classList.toggle("imagery", want);
+    }
+    updateAttribution();
   }
 
   function updateAttribution() {
-    const on = state.exploring && state.useImagery && state.imageryOk;
-    document.getElementById("attribution").textContent = on
-      ? IMAGERY_CREDIT : "Earth texture: NASA Blue Marble";
+    document.getElementById("attribution").textContent = state.tilesOn
+      ? IMAGERY_CREDIT : "Land data: NASA Blue Marble";
   }
 
 
-  // ── Intro: pixels assemble into the Earth ────────────────────────────────
-  /* Samples the Earth texture on a coarse screen grid covering the globe's disc,
-   * scatters those "pixels" across the viewport and flies them into place, then
-   * cross-fades to the WebGL globe. Each pixel's lat/lng comes from intersecting
-   * its camera ray with the sphere, so the mosaic matches the rendered globe. */
-  function loadTexturePixels(url, w, h) {
+  // ── Particle Earth ───────────────────────────────────────────────────────
+  /* Points on a Fibonacci sphere, kept where the mask says land (plus a sparse
+   * scattering over ocean and a thin dust shell above the surface). */
+  let particleSets = [];
+
+  function loadMask(url, w, h) {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.crossOrigin = "anonymous";
@@ -545,99 +585,173 @@
     });
   }
 
-  function buildMosaic(tex, tw, th, step) {
-    const pov = world.pointOfView();
-    const center = world.getScreenCoords(pov.lat, pov.lng, 0);
-    const d = 1 + pov.altitude;
-    const f = (window.innerHeight / 2) / Math.tan((world.camera().fov * Math.PI) / 360);
-    const a = -pov.lat * Math.PI / 180, b = pov.lng * Math.PI / 180;
-    const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
-    const discR = f * Math.tan(Math.asin(1 / d)) + step;
-    const pixels = [];
-    for (let dy = -discR; dy <= discR; dy += step) {
-      for (let dx = -discR; dx <= discR; dx += step) {
-        const len = Math.hypot(dx, dy, f);
-        const vx = dx / len, vy = -dy / len, vz = -f / len;
-        const bq = d * vz, disc = bq * bq - (d * d - 1);
-        if (disc < 0) continue;
-        const t = -bq - Math.sqrt(disc);
-        const x = t * vx, y = t * vy, z = d + t * vz;
-        // Rotate from camera frame to globe frame.
-        const y1 = y * ca - z * sa, z1 = y * sa + z * ca;
-        const X = x * cb + z1 * sb, Z = -x * sb + z1 * cb;
-        const lat = Math.asin(Math.max(-1, Math.min(1, y1))) * 180 / Math.PI;
-        const lng = Math.atan2(X, Z) * 180 / Math.PI;
-        const u = Math.min(tw - 1, Math.floor(((lng + 180) / 360) * tw));
-        const v = Math.min(th - 1, Math.floor(((90 - lat) / 180) * th));
-        const k = (v * tw + u) * 4;
-        const shade = GLOBE_TINT * (0.55 + 0.55 * Math.max(0, z));
-        pixels.push({
-          x: center.x + dx, y: center.y + dy,
-          r: tex[k] * shade | 0, g: tex[k + 1] * shade | 0, b: tex[k + 2] * shade | 0,
-        });
-      }
-    }
-    return pixels;
+  /* Hit-testing 150k points on every mouse move is slow and they aren't
+   * interactive, so take them out of raycasting (clicks still reach the globe). */
+  function setParticles(sets) {
+    world.particlesData(sets);
+    requestAnimationFrame(() => world.scene().traverse((o) => { if (o.isPoints) o.raycast = () => {}; }));
   }
 
-  async function runIntro() {
+  function buildParticles(mask, mw, mh) {
+    const N = window.innerWidth < 700 ? 90000 : 150000;
+    const golden = Math.PI * (3 - Math.sqrt(5));
+    const sets = { landBright: [], landDim: [], ocean: [], shell: [] };
+    for (let i = 0; i < N; i++) {
+      const y = 1 - (2 * (i + 0.5)) / N;
+      const lat = Math.asin(y) * 180 / Math.PI + (Math.random() - 0.5) * 0.3;
+      const lng = O.wrapLng(((i * golden) % (2 * Math.PI)) * 180 / Math.PI + (Math.random() - 0.5) * 0.3);
+      const u = Math.min(mw - 1, Math.floor(((lng + 180) / 360) * mw));
+      const v = Math.min(mh - 1, Math.max(0, Math.floor(((90 - lat) / 180) * mh)));
+      const water = mask[(v * mw + u) * 4] > 128;
+      if (!water) (Math.random() < 0.38 ? sets.landBright : sets.landDim).push([lat, lng, 0.002]);
+      else if (Math.random() < 0.035) sets.ocean.push([lat, lng, 0.001]);
+    }
+    for (let i = 0; i < 2600; i++) {
+      const lat = Math.asin(2 * Math.random() - 1) * 180 / Math.PI;
+      sets.shell.push([lat, Math.random() * 360 - 180, 0.006 + Math.pow(Math.random(), 3) * 0.12]);
+    }
+    return Object.entries(sets).map(([kind, points]) => ({ kind, points }));
+  }
+
+  // ── Dust drifting off the limb (screen-space overlay) ─────────────────────
+  const dust = { canvas: null, ctx: null, parts: [], last: 0 };
+
+  function globeScreenDisc() {
+    const pov = world.pointOfView();
+    const c = world.getScreenCoords(pov.lat, pov.lng, 0);
+    const d = 1 + pov.altitude;
+    const f = (window.innerHeight / 2) / Math.tan((world.camera().fov * Math.PI) / 360);
+    return { x: c.x, y: c.y, r: f * Math.tan(Math.asin(1 / d)), d };
+  }
+
+  function startDust() {
+    if (reduceMotion) return;
+    const canvas = document.createElement("canvas");
+    canvas.className = "dust-canvas";
+    document.body.appendChild(canvas);
+    dust.canvas = canvas;
+    dust.ctx = canvas.getContext("2d");
+    const size = () => {
+      canvas.width = window.innerWidth * DPR; canvas.height = window.innerHeight * DPR;
+      dust.ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    };
+    window.addEventListener("resize", size);
+    size();
+    requestAnimationFrame(stepDust);
+  }
+
+  function spawnDust(disc) {
+    // Leave from the right-hand limb and drift away like dust in a breeze.
+    const th = (Math.random() - 0.5) * Math.PI * 0.95;
+    const rr = disc.r * (0.86 + Math.random() * 0.16);
+    const k = disc.r / 300;
+    return {
+      x: disc.x + Math.cos(th) * rr, y: disc.y + Math.sin(th) * rr,
+      vx: (0.12 + Math.random() * 0.55) * k, vy: (Math.sin(th) * 0.12 + (Math.random() - 0.5) * 0.08) * k,
+      life: 0, max: 3 + Math.random() * 6, s: Math.random() < 0.2 ? 1.6 : 1.1,
+    };
+  }
+
+  function stepDust(now) {
+    const dt = Math.min(0.05, (now - (dust.last || now)) / 1000);
+    dust.last = now;
+    const ctx = dust.ctx, W = window.innerWidth, H = window.innerHeight;
+    ctx.clearRect(0, 0, W, H);
+    const disc = globeScreenDisc();
+    // Only when the whole planet is in frame, and not while exploring.
+    const target = !state.exploring && state.introDone && disc.d > 2.1 ? 1 : 0;
+    dust.vis = (dust.vis || 0) + (target - (dust.vis || 0)) * Math.min(1, dt * 2);
+    const want = Math.round(1800 * dust.vis);
+    while (dust.parts.length < want) {
+      const p = spawnDust(disc);
+      p.life = Math.random() * p.max;
+      p.x += p.vx * 60 * p.life; p.y += p.vy * 60 * p.life;
+      dust.parts.push(p);
+    }
+    if (dust.parts.length > want) dust.parts.length = want;
+    for (let i = 0; i < dust.parts.length; i++) {
+      let p = dust.parts[i];
+      p.life += dt;
+      if (p.life > p.max) { p = dust.parts[i] = spawnDust(disc); }
+      p.x += p.vx * 60 * dt; p.y += p.vy * 60 * dt;
+      const fade = 1 - p.life / p.max;
+      ctx.globalAlpha = 0.8 * fade * Math.sqrt(fade) * dust.vis;
+      ctx.fillStyle = "#c8d4d6";
+      ctx.fillRect(p.x, p.y, p.s, p.s);
+    }
+    requestAnimationFrame(stepDust);
+  }
+
+  // ── Intro: dust streams in and condenses into the planet ──────────────────
+  /* Projects the visible particles to screen, starts each one somewhere in a
+   * dust cloud trailing off to the right, and flies it home. The 2D frame then
+   * cross-fades to the identical WebGL particle globe. */
+  function runIntro() {
     if (state.introStarted) return;
     state.introStarted = true;
     if (reduceMotion) return finishIntro();
-    let tex;
-    const TW = 1024, TH = 512;
-    try { tex = await loadTexturePixels(EARTH_TEXTURE, TW, TH); } catch (e) { return finishIntro(); }
 
     const W = window.innerWidth, H = window.innerHeight;
-    const step = W < 600 ? 4 : 5;
-    const pixels = buildMosaic(tex, TW, TH, step);
+    const pov = world.pointOfView();
+    const horizon = Math.cos(Math.acos(1 / (1 + pov.altitude)));
+    const p0 = pov.lat * Math.PI / 180, l0 = pov.lng * Math.PI / 180;
+    const pts = [];
+    for (const set of particleSets) {
+      if (set.kind === "shell") continue;
+      const { color, size } = PARTICLE_STYLE[set.kind];
+      const [r, g, b, a] = color.match(/[\d.]+/g).map(Number);
+      for (const [lat, lng] of set.points) {
+        const p = lat * Math.PI / 180, l = lng * Math.PI / 180;
+        const cosc = Math.sin(p0) * Math.sin(p) + Math.cos(p0) * Math.cos(p) * Math.cos(l - l0);
+        if (cosc < horizon + 0.01) continue;
+        const sc = world.getScreenCoords(lat, lng, 0.002);
+        pts.push({ x: sc.x, y: sc.y, c: `rgb(${r},${g},${b})`, a, s: size });
+      }
+    }
+    if (!pts.length) return finishIntro();
+
     const canvas = document.createElement("canvas");
     canvas.className = "intro-canvas";
-    const dpr = Math.min(window.devicePixelRatio, 2);
-    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.width = W * DPR; canvas.height = H * DPR;
     document.body.appendChild(canvas);
     const ctx = canvas.getContext("2d");
-    ctx.scale(dpr, dpr);
+    ctx.scale(DPR, DPR);
 
-    const cx = pixels.reduce((s, p) => s + p.x, 0) / pixels.length;
-    const cy = pixels.reduce((s, p) => s + p.y, 0) / pixels.length;
-    for (const p of pixels) {
-      const ang = Math.random() * Math.PI * 2;
-      const dist = Math.hypot(W, H) * (0.25 + Math.random() * 0.6);
-      p.sx = cx + Math.cos(ang) * dist;
-      p.sy = cy + Math.sin(ang) * dist;
-      // Pixels near the centre settle first, the limb last.
-      p.delay = Math.hypot(p.x - cx, p.y - cy) / (step * 120) + Math.random() * 0.35;
-      p.color = `rgb(${p.r},${p.g},${p.b})`;
+    for (const p of pts) {
+      if (Math.random() < 0.8) {
+        p.sx = p.x + W * (0.25 + Math.random() * 0.95);
+        p.sy = p.y + (Math.random() - 0.5) * H * 0.55;
+      } else {
+        p.sx = Math.random() * W * 1.2;
+        p.sy = Math.random() * H;
+      }
+      p.delay = Math.random() * 1.1;
     }
-    const maxDelay = Math.max(...pixels.map((p) => p.delay));
-    const FLY = 1.5, total = maxDelay + FLY;
-    const size = step - 1;
+    const FLY = 1.9, total = 1.1 + FLY;
     const ease = (t) => 1 - Math.pow(1 - t, 3);
     const t0 = performance.now();
+    pts.sort((a, b) => (a.c < b.c ? -1 : 1));   // fewer fillStyle switches
 
     function frame(now) {
       const t = (now - t0) / 1000;
       ctx.clearRect(0, 0, W, H);
-      for (const p of pixels) {
+      let lastC = null;
+      for (const p of pts) {
         const k = Math.min(1, Math.max(0, (t - p.delay) / FLY));
-        ctx.globalAlpha = 0.3 + 0.7 * k;
         const e = ease(k);
-        ctx.fillStyle = p.color;
-        ctx.fillRect(p.sx + (p.x - p.sx) * e - size / 2, p.sy + (p.y - p.sy) * e - size / 2, size, size);
+        if (p.c !== lastC) { ctx.fillStyle = p.c; lastC = p.c; }
+        ctx.globalAlpha = p.a * (0.25 + 0.75 * k);
+        ctx.fillRect(p.sx + (p.x - p.sx) * e - p.s / 2, p.sy + (p.y - p.sy) * e - p.s / 2, p.s, p.s);
       }
       if (t < total) return requestAnimationFrame(frame);
-      ctx.globalAlpha = 1;
       finishIntro(canvas);
     }
-    document.body.classList.add("intro-running");
     requestAnimationFrame(frame);
   }
 
   function finishIntro(canvas) {
     state.introStarted = true;
     state.introDone = true;
-    document.body.classList.remove("intro-running");
     document.body.classList.add("intro-done");
     const cfg = CHAPTERS[state.chapter];
     if (!state.exploring && cfg) controls.autoRotate = !!cfg.rotate && !reduceMotion;
@@ -647,11 +761,21 @@
     }
   }
 
+  loadMask(LAND_MASK, 800, 400)
+    .then((mask) => {
+      particleSets = buildParticles(mask, 800, 400);
+      setParticles(particleSets);
+      // Two frames so the camera and renderer have settled before projecting.
+      requestAnimationFrame(() => requestAnimationFrame(runIntro));
+    })
+    .catch(() => finishIntro());
+  startDust();
+
   refreshHtml();
   updateAttribution();
   activateChapter("hero", true);
   requestAnimationFrame(tick);
-  // If the texture never reports ready, show the globe anyway.
+  // If the land data never loads, show the globe anyway.
   setTimeout(() => { if (!state.introStarted) finishIntro(); }, 8000);
 
   // Debug/test hook.

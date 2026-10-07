@@ -1,13 +1,13 @@
 :root {
-  --bg: #070708;
-  --panel: rgba(16, 16, 18, 0.9);
+  --bg: #060708;
+  --panel: rgba(10, 12, 13, 0.88);
   --panel-solid: #121214;
-  --border: rgba(232, 226, 214, 0.12);
-  --border-strong: rgba(232, 226, 214, 0.28);
-  --text: #e6e1d6;
-  --body: #c4beb2;
-  --muted: #8d887e;
-  --accent: #d8cdb6;
+  --border: rgba(214, 224, 226, 0.12);
+  --border-strong: rgba(214, 224, 226, 0.28);
+  --text: #e3e7e7;
+  --body: #b9c1c2;
+  --muted: #7f8a8c;
+  --accent: #c9d6d8;
   --radius: 4px;
   --font: "EB Garamond", Garamond, "Times New Roman", serif;
   --c-cyclone: #8299a8;
@@ -31,12 +31,13 @@ body {
 }
 
 button, input { font: inherit; color: inherit; }
-code { font-family: var(--font); font-style: italic; color: var(--text); }
+code { font-family: var(--font); color: var(--text); }
 
 /* ── Globe layer ────────────────────────────────────────────────────────── */
 #globe { position: fixed; inset: 0; z-index: 0; transition: opacity 1.1s ease; }
-/* Mute the Blue Marble's saturated colours so the planet reads as photographed, not painted. */
-#globe canvas, .intro-canvas { filter: saturate(0.62) brightness(0.82) contrast(1.06) sepia(0.08); }
+/* Mute photographic tiles when exploring up close so they sit with the monochrome UI. */
+body.imagery #globe canvas { filter: saturate(0.7) brightness(0.85); }
+.dust-canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
 body:not(.intro-done) #globe { opacity: 0; }
 .intro-canvas {
   position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none;
@@ -70,7 +71,7 @@ body:not(.intro-done) .topbar, body:not(.intro-done) #story { opacity: 0; }
 .progress { display: flex; gap: 10px; margin-left: auto; }
 .progress a {
   width: 6px; height: 6px; border-radius: 50%;
-  background: rgba(232, 226, 214, 0.22);
+  background: rgba(214, 224, 226, 0.22);
   transition: background 0.3s;
 }
 .progress a.on { background: var(--accent); }
@@ -83,7 +84,7 @@ body.exploring .progress { visibility: hidden; }
   transition: background 0.2s, border-color 0.2s, color 0.2s;
 }
 .btn-ghost { background: rgba(16, 16, 18, 0.6); }
-.btn-ghost:hover { background: rgba(232, 226, 214, 0.08); border-color: var(--accent); }
+.btn-ghost:hover { background: rgba(214, 224, 226, 0.08); border-color: var(--accent); }
 .btn-primary { background: var(--text); color: #141414; border-color: var(--text); }
 .btn-primary:hover { background: #fff; }
 :focus-visible { outline: 1px solid var(--accent); outline-offset: 3px; }
@@ -116,7 +117,7 @@ body.exploring { overflow: hidden; }
 
 h1, h2, h3, h4 { font-family: var(--font); font-weight: 500; margin: 0 0 12px; line-height: 1.12; color: var(--text); }
 h1 { font-size: clamp(38px, 4.8vw, 64px); letter-spacing: -0.01em; }
-h1 em { font-style: italic; font-weight: 400; color: var(--accent); }
+h1 em { font-style: normal; font-weight: 400; color: var(--muted); }
 h2 { font-size: 34px; letter-spacing: -0.005em; }
 h3 { font-size: 27px; }
 h4 { font-size: 18px; margin-top: 20px; display: flex; align-items: center; gap: 8px; }
@@ -128,9 +129,9 @@ p { margin: 0 0 14px; color: var(--body); }
   font-size: 14px; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--muted); margin-bottom: 12px;
 }
-.fine { font-size: 15px; color: var(--muted); margin: 12px 0 0; font-style: italic; }
+.fine { font-size: 15px; color: var(--muted); margin: 12px 0 0; }
 
-.hint { display: flex; align-items: center; gap: 12px; margin-top: 36px; font-size: 16px; color: var(--muted); font-style: italic; }
+.hint { display: flex; align-items: center; gap: 12px; margin-top: 36px; font-size: 16px; color: var(--muted); }
 .mouse { width: 18px; height: 28px; border: 1px solid var(--muted); border-radius: 10px; position: relative; flex: none; }
 .mouse::after {
   content: ""; position: absolute; left: 50%; top: 5px; width: 1px; height: 6px;
@@ -173,7 +174,7 @@ p { margin: 0 0 14px; color: var(--body); }
   background: transparent; border: 1px solid var(--border);
   transition: background 0.2s, border-color 0.2s;
 }
-.chip:hover { background: rgba(232, 226, 214, 0.05); border-color: var(--border-strong); }
+.chip:hover { background: rgba(214, 224, 226, 0.05); border-color: var(--border-strong); }
 .chip strong { display: block; font-size: 16px; font-weight: 500; line-height: 1.25; }
 .chip small { display: block; font-size: 14px; color: var(--muted); line-height: 1.3; margin-top: 2px; }
 .chip-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; margin-top: 7px; background: var(--c); }
@@ -186,7 +187,7 @@ p { margin: 0 0 14px; color: var(--body); }
 }
 .pipeline li:last-child { border-bottom: 1px solid var(--border); }
 .pipeline strong { font-weight: 500; font-size: 19px; }
-.pipeline .step { grid-row: span 2; font-size: 22px; font-style: italic; color: var(--muted); }
+.pipeline .step { grid-row: span 2; font-size: 22px; color: var(--muted); }
 .pipeline small { color: var(--muted); font-size: 15.5px; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 
 /* ── Globe HTML markers ─────────────────────────────────────────────────── */
@@ -198,13 +199,16 @@ p { margin: 0 0 14px; color: var(--body); }
   transition: opacity 0.4s;
 }
 .sat-dot {
-  position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px;
+  position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px;
+  border-radius: 50%; border: 1.5px solid var(--c); background: rgba(6, 7, 8, 0.65);
+  transition: transform 0.3s, background 0.3s;
+}
+.sat-dot::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 2px; height: 2px; margin: -1px 0 0 -1px;
   border-radius: 50%; background: var(--c);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
-  transition: transform 0.3s;
 }
 .sat:hover .sat-dot, .sat.hl .sat-dot { transform: scale(1.4); }
-.sat.selected .sat-dot { transform: scale(1.6); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 0 0 3px var(--text); }
+.sat.selected .sat-dot { transform: scale(1.6); background: var(--c); }
 .sat.dim { opacity: 0.25; }
 .sat.occluded { opacity: 0; pointer-events: none; }
 .sat-label {
@@ -224,14 +228,14 @@ p { margin: 0 0 14px; color: var(--body); }
   position: absolute; left: 18px; top: 50%; transform: translateY(-50%);
   white-space: nowrap; padding: 2px 9px; border-radius: var(--radius);
   background: rgba(16, 16, 18, 0.88); border: 1px solid var(--border-strong);
-  font-size: 15px; font-style: italic;
+  font-size: 15px;
 }
 .site.occluded, .pin.occluded { opacity: 0; }
 
 .pin {
   width: 12px; height: 12px; transform: translate(-50%, -50%); pointer-events: none;
-  border-radius: 50%; border: 1px solid var(--text); background: rgba(230, 225, 214, 0.25);
-  box-shadow: 0 0 0 5px rgba(230, 225, 214, 0.12);
+  border-radius: 50%; border: 1px solid var(--text); background: rgba(214, 224, 226, 0.25);
+  box-shadow: 0 0 0 5px rgba(214, 224, 226, 0.12);
 }
 
 /* ── Floating panels ────────────────────────────────────────────────────── */
@@ -251,7 +255,7 @@ body.exploring .legend-panel { opacity: 1; transform: none; pointer-events: auto
   width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
   padding: 4px 6px; border: 0; border-radius: var(--radius); background: transparent; cursor: pointer;
 }
-.legend-item:hover { background: rgba(232, 226, 214, 0.05); }
+.legend-item:hover { background: rgba(214, 224, 226, 0.05); }
 .legend-item .legend-dot { margin-top: 0; }
 .legend-item[aria-pressed="false"] { opacity: 0.4; }
 .legend-item[aria-pressed="false"] .legend-dot { background: transparent; border: 1px solid var(--c); }
@@ -301,9 +305,9 @@ body.exploring .explore-ui > * { pointer-events: auto; }
   border: 0; background: transparent; padding: 5px 12px; cursor: pointer; font-size: 16px; color: var(--muted);
 }
 .seg button + button, .zoom button + button { border-left: 1px solid var(--border); }
-.seg button.on { background: rgba(232, 226, 214, 0.1); color: var(--text); }
+.seg button.on { background: rgba(214, 224, 226, 0.1); color: var(--text); }
 .zoom button { font-size: 19px; line-height: 1; padding: 5px 13px; color: var(--text); }
-.zoom button:hover, .seg button:hover { background: rgba(232, 226, 214, 0.06); }
+.zoom button:hover, .seg button:hover { background: rgba(214, 224, 226, 0.06); }
 .toggle {
   display: flex; align-items: center; gap: 8px; font-size: 16px; padding: 5px 14px;
   border: 1px solid var(--border-strong); border-radius: var(--radius); background: rgba(16, 16, 18, 0.85); cursor: pointer;
@@ -313,9 +317,9 @@ body.exploring .explore-ui > * { pointer-events: auto; }
 .explore-hint {
   position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
   margin: 0; padding: 5px 16px; border-radius: var(--radius); white-space: nowrap;
-  background: rgba(16, 16, 18, 0.85); border: 1px solid var(--border); font-size: 15px; font-style: italic; color: var(--muted);
+  background: rgba(16, 16, 18, 0.85); border: 1px solid var(--border); font-size: 15px; color: var(--muted);
 }
-.attribution { position: absolute; right: 12px; bottom: 6px; margin: 0; font-size: 13px; color: rgba(232, 226, 214, 0.4); }
+.attribution { position: absolute; right: 12px; bottom: 6px; margin: 0; font-size: 13px; color: rgba(214, 224, 226, 0.4); }
 
 #explore-btn { flex: none; }
 body.exploring #explore-btn { visibility: hidden; }
@@ -326,7 +330,7 @@ body.exploring #explore-btn { visibility: hidden; }
   font-size: 15px; display: grid; gap: 0; white-space: nowrap;
 }
 .tooltip[hidden] { display: none; }
-.tooltip span { font-size: 14px; font-style: italic; color: var(--muted) !important; }
+.tooltip span { font-size: 14px; color: var(--muted) !important; }
 
 /* ── Small screens ──────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
