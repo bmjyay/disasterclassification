@@ -15,7 +15,7 @@ const CATEGORIES = {
   optical: {
     short: "Sunlight & heat cameras: burn scars, flood extents, damage.",
     label: "Optical & thermal imaging",
-    color: "#3ddc97",
+    color: "#8fae7f",
     blurb: "Cameras that see reflected sunlight and emitted heat. They map burn scars, " +
            "flood extents and damaged buildings in daylight, and thermal bands spot " +
            "active fires day or night. Clouds and smoke block the view.",
@@ -23,7 +23,7 @@ const CATEGORIES = {
   radar: {
     short: "Sees through cloud and darkness: floods, ground motion.",
     label: "Radar (SAR) & altimetry",
-    color: "#ff9f43",
+    color: "#c4935f",
     blurb: "Synthetic-aperture radar sends its own microwave pulses, so it sees through " +
            "clouds, smoke and darkness. Ideal for flood mapping during storms and, via " +
            "interferometry (InSAR), measuring ground that moved in an earthquake.",
@@ -31,7 +31,7 @@ const CATEGORIES = {
   weather: {
     short: "Watches storms form, every few minutes.",
     label: "Weather",
-    color: "#4cc9f0",
+    color: "#7b9cb3",
     blurb: "Geostationary imagers stare at one hemisphere and refresh every few minutes, " +
            "tracking cyclones as they form. Polar weather satellites add sounders, " +
            "scatterometers and precipitation radar.",
@@ -39,14 +39,14 @@ const CATEGORIES = {
   comms: {
     short: "Keeps responders connected when networks fail.",
     label: "Communications",
-    color: "#b388ff",
+    color: "#9d8bb0",
     blurb: "Relay voice and data. After a disaster knocks out ground networks, satellite " +
            "links keep responders, hospitals and families connected.",
   },
   nav: {
     short: "Positioning, timing and crustal-motion measurement.",
     label: "Navigation (GNSS)",
-    color: "#ffd166",
+    color: "#c9b46f",
     blurb: "GPS, Galileo and GLONASS broadcast precise timing signals. Besides positioning, " +
            "networks of ground receivers measure millimetre-scale crustal motion before " +
            "and after earthquakes.",
@@ -54,7 +54,7 @@ const CATEGORIES = {
   crewed: {
     short: "Astronaut photography and station instruments.",
     label: "Crewed stations",
-    color: "#ff6b9d",
+    color: "#b97a7a",
     blurb: "Astronauts photograph disasters by hand, and station-mounted instruments " +
            "measure lightning, vegetation and ocean winds.",
   },

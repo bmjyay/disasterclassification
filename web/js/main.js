@@ -7,11 +7,14 @@
   const IMAGERY_URL = (x, y, l) =>
     `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${l}/${y}/${x}`;
   const IMAGERY_CREDIT = "Imagery © Esri, Maxar, Earthstar Geographics";
+  const EARTH_TEXTURE = TEX + "earth-blue-marble.jpg";
+  // Darkens the Blue Marble texture for a matte, less saturated planet.
+  const GLOBE_TINT = 0.8;
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const flyMs = (ms) => (reduceMotion ? 0 : ms);
 
   const DISASTER_COLORS = {
-    cyclone: "#4cc9f0", earthquake: "#f4a261", flood: "#3a86ff", wildfire: "#ff4d4d",
+    cyclone: "#8299a8", earthquake: "#a8876a", flood: "#6d8596", wildfire: "#a9654f",
   };
 
   // Camera + highlight for each scroll chapter.
@@ -100,12 +103,13 @@
 
   // ── Globe ────────────────────────────────────────────────────────────────
   const globeEl = document.getElementById("globe");
-  const world = Globe({ animateIn: !reduceMotion })(globeEl)
-    .globeImageUrl(TEX + "earth-blue-marble.jpg")
+  const world = Globe({ animateIn: false })(globeEl)
+    .globeImageUrl(EARTH_TEXTURE)
     .bumpImageUrl(TEX + "earth-topology.png")
-    .backgroundImageUrl(TEX + "night-sky.png")
-    .atmosphereColor("#7cc4ff")
-    .atmosphereAltitude(0.22)
+    .backgroundColor("#070708")
+    .atmosphereColor("#9fb0bf")
+    .atmosphereAltitude(0.12)
+    .onGlobeReady(() => requestAnimationFrame(() => requestAnimationFrame(runIntro)))
     .htmlElementsData([])
     .htmlLat("lat").htmlLng("lng").htmlAltitude("alt")
     .htmlElement((d) => d.el)
@@ -120,7 +124,7 @@
     .pathDashGap((d) => (d.dash ? d.dash : 0))
     .pathTransitionDuration(0)
     .ringsData([])
-    .ringColor((d) => (t) => hexA(d.color, 1 - t))
+    .ringColor((d) => (t) => hexA(d.color, 0.6 * (1 - t)))
     .ringMaxRadius((d) => d.r)
     .ringPropagationSpeed((d) => d.speed)
     .ringRepeatPeriod((d) => d.period)
@@ -128,6 +132,16 @@
     .onZoom(updateAttribution);
 
   world.renderer().setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  // Matte surface: dim the texture, kill the specular highlight, soften the fill light.
+  const globeMat = world.globeMaterial();
+  globeMat.color.setRGB(GLOBE_TINT, GLOBE_TINT, GLOBE_TINT * 1.02);
+  if (globeMat.specular) globeMat.specular.setRGB(0.04, 0.04, 0.04);
+  globeMat.shininess = 2;
+  globeMat.bumpScale = 3;
+  for (const light of world.lights()) {
+    if (light.isAmbientLight) light.intensity *= 0.6;
+  }
   const controls = world.controls();
   controls.enableZoom = false;
   controls.autoRotate = !reduceMotion;
@@ -205,12 +219,12 @@
     for (const d of tracked) {
       if (state.hiddenCats.has(d.sat.cat)) continue;
       const color = O.CATEGORIES[d.sat.cat].color;
-      paths.push({ pts: O.orbitPath(d.sat, date), color: hexA(color, 0.55), stroke: 0.6 });
+      paths.push({ pts: O.orbitPath(d.sat, date), color: hexA(color, 0.35), stroke: 0.4 });
     }
     if (state.selected) {
       const d = state.selected;
       const r = O.footprintRadiusDeg(d.altKm);
-      paths.push({ pts: O.circlePath(d.lat, d.lng, Math.min(r, 80)), color: hexA(O.CATEGORIES[d.sat.cat].color, 0.9), stroke: 0.4, dash: 0.02 });
+      paths.push({ pts: O.circlePath(d.lat, d.lng, Math.min(r, 80)), color: hexA(O.CATEGORIES[d.sat.cat].color, 0.6), stroke: 0.3, dash: 0.02 });
     }
     world.pathsData(paths);
   }
@@ -246,7 +260,7 @@
     if (e.target.closest("[data-enter-explore]")) enterExplore();
   });
 
-  function activateChapter(name) {
+  function activateChapter(name, instant = false) {
     if (state.exploring || state.chapter === name) return;
     state.chapter = name;
     const cfg = CHAPTERS[name];
@@ -258,21 +272,21 @@
     closeInfo();
     state.highlight = cfg.highlight ? new Set(cfg.highlight) : null;
     state.dimAll = cfg.sats === "dim";
-    controls.autoRotate = !!cfg.rotate && !reduceMotion;
+    controls.autoRotate = !!cfg.rotate && !reduceMotion && state.introDone;
 
     if (cfg.site) {
       siteMarker.active = true;
       siteMarker.lat = cfg.site.lat; siteMarker.lng = cfg.site.lng;
       siteMarker.el.style.setProperty("--c", DISASTER_COLORS[cfg.site.kind]);
       siteMarker.el.querySelector(".site-label").textContent = cfg.site.label;
-      world.ringsData([{ lat: cfg.site.lat, lng: cfg.site.lng, color: DISASTER_COLORS[cfg.site.kind], r: 6, speed: 3, period: 1100 }]);
+      world.ringsData([{ lat: cfg.site.lat, lng: cfg.site.lng, color: DISASTER_COLORS[cfg.site.kind], r: 4, speed: 1.2, period: 2400 }]);
     } else {
       siteMarker.active = false;
       world.ringsData([]);
     }
     refreshHtml();
     refreshPaths(new Date(state.simTime));
-    world.pointOfView(cfg.pov, flyMs(2200));
+    world.pointOfView(cfg.pov, instant ? 0 : flyMs(2200));
   }
 
   const io = new IntersectionObserver((entries) => {
@@ -509,10 +523,136 @@
       ? IMAGERY_CREDIT : "Earth texture: NASA Blue Marble";
   }
 
+
+  // ── Intro: pixels assemble into the Earth ────────────────────────────────
+  /* Samples the Earth texture on a coarse screen grid covering the globe's disc,
+   * scatters those "pixels" across the viewport and flies them into place, then
+   * cross-fades to the WebGL globe. Each pixel's lat/lng comes from intersecting
+   * its camera ray with the sphere, so the mosaic matches the rendered globe. */
+  function loadTexturePixels(url, w, h) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const ctx = c.getContext("2d", { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(ctx.getImageData(0, 0, w, h).data);
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  function buildMosaic(tex, tw, th, step) {
+    const pov = world.pointOfView();
+    const center = world.getScreenCoords(pov.lat, pov.lng, 0);
+    const d = 1 + pov.altitude;
+    const f = (window.innerHeight / 2) / Math.tan((world.camera().fov * Math.PI) / 360);
+    const a = -pov.lat * Math.PI / 180, b = pov.lng * Math.PI / 180;
+    const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+    const discR = f * Math.tan(Math.asin(1 / d)) + step;
+    const pixels = [];
+    for (let dy = -discR; dy <= discR; dy += step) {
+      for (let dx = -discR; dx <= discR; dx += step) {
+        const len = Math.hypot(dx, dy, f);
+        const vx = dx / len, vy = -dy / len, vz = -f / len;
+        const bq = d * vz, disc = bq * bq - (d * d - 1);
+        if (disc < 0) continue;
+        const t = -bq - Math.sqrt(disc);
+        const x = t * vx, y = t * vy, z = d + t * vz;
+        // Rotate from camera frame to globe frame.
+        const y1 = y * ca - z * sa, z1 = y * sa + z * ca;
+        const X = x * cb + z1 * sb, Z = -x * sb + z1 * cb;
+        const lat = Math.asin(Math.max(-1, Math.min(1, y1))) * 180 / Math.PI;
+        const lng = Math.atan2(X, Z) * 180 / Math.PI;
+        const u = Math.min(tw - 1, Math.floor(((lng + 180) / 360) * tw));
+        const v = Math.min(th - 1, Math.floor(((90 - lat) / 180) * th));
+        const k = (v * tw + u) * 4;
+        const shade = GLOBE_TINT * (0.55 + 0.55 * Math.max(0, z));
+        pixels.push({
+          x: center.x + dx, y: center.y + dy,
+          r: tex[k] * shade | 0, g: tex[k + 1] * shade | 0, b: tex[k + 2] * shade | 0,
+        });
+      }
+    }
+    return pixels;
+  }
+
+  async function runIntro() {
+    if (state.introStarted) return;
+    state.introStarted = true;
+    if (reduceMotion) return finishIntro();
+    let tex;
+    const TW = 1024, TH = 512;
+    try { tex = await loadTexturePixels(EARTH_TEXTURE, TW, TH); } catch (e) { return finishIntro(); }
+
+    const W = window.innerWidth, H = window.innerHeight;
+    const step = W < 600 ? 4 : 5;
+    const pixels = buildMosaic(tex, TW, TH, step);
+    const canvas = document.createElement("canvas");
+    canvas.className = "intro-canvas";
+    const dpr = Math.min(window.devicePixelRatio, 2);
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    document.body.appendChild(canvas);
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+
+    const cx = pixels.reduce((s, p) => s + p.x, 0) / pixels.length;
+    const cy = pixels.reduce((s, p) => s + p.y, 0) / pixels.length;
+    for (const p of pixels) {
+      const ang = Math.random() * Math.PI * 2;
+      const dist = Math.hypot(W, H) * (0.25 + Math.random() * 0.6);
+      p.sx = cx + Math.cos(ang) * dist;
+      p.sy = cy + Math.sin(ang) * dist;
+      // Pixels near the centre settle first, the limb last.
+      p.delay = Math.hypot(p.x - cx, p.y - cy) / (step * 120) + Math.random() * 0.35;
+      p.color = `rgb(${p.r},${p.g},${p.b})`;
+    }
+    const maxDelay = Math.max(...pixels.map((p) => p.delay));
+    const FLY = 1.5, total = maxDelay + FLY;
+    const size = step - 1;
+    const ease = (t) => 1 - Math.pow(1 - t, 3);
+    const t0 = performance.now();
+
+    function frame(now) {
+      const t = (now - t0) / 1000;
+      ctx.clearRect(0, 0, W, H);
+      for (const p of pixels) {
+        const k = Math.min(1, Math.max(0, (t - p.delay) / FLY));
+        ctx.globalAlpha = 0.3 + 0.7 * k;
+        const e = ease(k);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.sx + (p.x - p.sx) * e - size / 2, p.sy + (p.y - p.sy) * e - size / 2, size, size);
+      }
+      if (t < total) return requestAnimationFrame(frame);
+      ctx.globalAlpha = 1;
+      finishIntro(canvas);
+    }
+    document.body.classList.add("intro-running");
+    requestAnimationFrame(frame);
+  }
+
+  function finishIntro(canvas) {
+    state.introStarted = true;
+    state.introDone = true;
+    document.body.classList.remove("intro-running");
+    document.body.classList.add("intro-done");
+    const cfg = CHAPTERS[state.chapter];
+    if (!state.exploring && cfg) controls.autoRotate = !!cfg.rotate && !reduceMotion;
+    if (canvas) {
+      canvas.classList.add("fade");
+      setTimeout(() => canvas.remove(), 1200);
+    }
+  }
+
   refreshHtml();
   updateAttribution();
-  activateChapter("hero");
+  activateChapter("hero", true);
   requestAnimationFrame(tick);
+  // If the texture never reports ready, show the globe anyway.
+  setTimeout(() => { if (!state.introStarted) finishIntro(); }, 8000);
 
   // Debug/test hook.
   window.DisasterWatch = { world, state, enterExplore, exitExplore, selectSatellite, onGround };
