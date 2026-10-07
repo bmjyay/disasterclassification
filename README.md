@@ -115,6 +115,9 @@ With 15 epochs on a GPU (or ~45 min CPU):
 
 `web/` is a static site that tells the story behind the model on a 3D globe:
 
+- **Particle Earth:** the planet is drawn from ~150k points sampled from a land mask, wrapped
+  in a faint web of orbit lines, with dust drifting off its edge. On load, the dust streams
+  in and condenses into the globe.
 - **Scroll story:** the camera flies to four real events (Cyclone Mocha, the Türkiye–Syria
   earthquakes, the 2022 Pakistan floods and the Lahaina fire) and highlights the satellites
   that observed each one.
@@ -122,8 +125,8 @@ With 15 epochs on a GPU (or ~45 min CPU):
   radar (SAR), weather, communications, navigation and crewed stations. Click any dot (or a
   chip in the story) for its purpose, instruments, orbit and role in disasters, then
   **Follow** it around the planet.
-- **Explore mode:** scroll to zoom, drag to rotate, and click anywhere to fly there. Real
-  satellite imagery tiles (Esri World Imagery) load as you zoom, and the panel lists which
+- **Explore mode:** scroll to zoom, drag to rotate, and click anywhere to fly there. Zoom in
+  close and the particles give way to real satellite imagery (Esri World Imagery), and the panel lists which
   satellites are above the horizon and whether it is day or night at that spot.
 
 Run it with any static server:
