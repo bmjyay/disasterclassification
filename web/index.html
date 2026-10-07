@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Disaster Watch</title>
+  <meta name="description" content="Explore the satellites that watch for cyclones, earthquakes, floods and wildfires, and see how a ResNet-50 classifier reads their imagery." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="globe" aria-label="Interactive 3D globe"></div>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="brand" href="#hero">
+      <span class="brand-mark" aria-hidden="true"></span>
+      Disaster Watch
+    </a>
+    <nav class="progress" aria-label="Story chapters"></nav>
+    <button class="btn btn-ghost" id="explore-btn" type="button">Explore the globe</button>
+  </header>
+
+  <!-- ── Scroll story ─────────────────────────────────────────────────────── -->
+  <main id="story">
+    <section class="chapter hero" id="hero" data-chapter="hero">
+      <div class="card hero-card">
+        <p class="eyebrow">Aerial &amp; satellite calamity detection</p>
+        <h1>Hundreds of eyes in orbit.<br />One question: <em>what just happened down there?</em></h1>
+        <p class="lede">
+          Scroll to follow the satellites that watch for cyclones, earthquakes, floods and
+          wildfires, and see how a ResNet-50 classifier turns their imagery into an answer.
+        </p>
+        <p class="hint"><span class="mouse" aria-hidden="true"></span> Scroll to begin, or click anywhere on Earth to fly there</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="constellation" data-chapter="constellation">
+      <div class="card">
+        <p class="eyebrow">The constellation</p>
+        <h2>Every dot is a satellite, colored by its job</h2>
+        <p>
+          Low orbits hug the planet and race around it every ~90 minutes. Navigation satellites
+          sit in the middle ring. Weather satellites park over one longitude at 36,000 km and
+          watch a whole hemisphere.
+        </p>
+        <ul class="legend-inline" data-legend></ul>
+        <p class="fine">Altitudes above low orbit are compressed so everything fits on screen.</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="cyclone" data-chapter="cyclone">
+      <div class="card">
+        <p class="eyebrow"><span class="tag tag-cyclone">Cyclone</span> Bay of Bengal · May 2023</p>
+        <h2>Cyclone Mocha</h2>
+        <p>
+          Mocha intensified over the Bay of Bengal and made landfall near Sittwe, Myanmar.
+          Geostationary imagers refreshed every few minutes to track the eye, while polar
+          satellites measured winds and rainfall from inside the storm.
+        </p>
+        <div class="sat-list" data-sats></div>
+        <p class="model-note"><strong>What the classifier sees:</strong> a tight spiral of cloud bands around a clear eye.</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="earthquake" data-chapter="earthquake">
+      <div class="card">
+        <p class="eyebrow"><span class="tag tag-earthquake">Earthquake</span> Türkiye–Syria · Feb 2023</p>
+        <h2>Kahramanmaraş earthquakes</h2>
+        <p>
+          A magnitude 7.8 quake ruptured hundreds of kilometres of the East Anatolian Fault.
+          Radar satellites compared before-and-after passes (InSAR) to map exactly how far
+          the ground moved, and sub-metre optical imagery located collapsed buildings.
+        </p>
+        <div class="sat-list" data-sats></div>
+        <p class="model-note"><strong>What the classifier sees:</strong> rubble textures and broken street grids, the most visually subtle class.</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="flood" data-chapter="flood">
+      <div class="card">
+        <p class="eyebrow"><span class="tag tag-flood">Flood</span> Sindh, Pakistan · 2022</p>
+        <h2>Pakistan monsoon floods</h2>
+        <p>
+          Record monsoon rain turned the lower Indus valley into an inland lake. Clouds hid the
+          ground for weeks, but radar cuts straight through them: calm floodwater reflects the
+          pulse away and shows up black.
+        </p>
+        <div class="sat-list" data-sats></div>
+        <p class="model-note"><strong>What the classifier sees:</strong> smooth brown water spreading over fields and roads.</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="wildfire" data-chapter="wildfire">
+      <div class="card">
+        <p class="eyebrow"><span class="tag tag-wildfire">Wildfire</span> Maui, Hawaiʻi · Aug 2023</p>
+        <h2>Lahaina fire</h2>
+        <p>
+          Hurricane-driven winds pushed a fast fire through Lahaina. Thermal sensors flagged hot
+          spots from orbit, GOES-West tracked the smoke plume every few minutes, and high-res
+          imagery mapped the burn scar afterwards.
+        </p>
+        <div class="sat-list" data-sats></div>
+        <p class="model-note"><strong>What the classifier sees:</strong> flame fronts, smoke plumes and charred ground.</p>
+      </div>
+    </section>
+
+    <section class="chapter" id="model" data-chapter="model">
+      <div class="card card-wide">
+        <p class="eyebrow">From pixels to a label</p>
+        <h2>How the classifier reads an image</h2>
+        <ol class="pipeline">
+          <li><span class="step">1</span><strong>Image tile</strong><small>Aerial or satellite photo, resized to 224×224</small></li>
+          <li><span class="step">2</span><strong>ResNet-50</strong><small>ImageNet-pretrained backbone, fine-tuned in two phases</small></li>
+          <li><span class="step">3</span><strong>Prediction</strong><small>
+            <span class="tag tag-cyclone">Cyclone</span>
+            <span class="tag tag-earthquake">Earthquake</span>
+            <span class="tag tag-flood">Flood</span>
+            <span class="tag tag-wildfire">Wildfire</span></small></li>
+          <li><span class="step">4</span><strong>Grad-CAM</strong><small>Heatmap of the pixels that drove the decision</small></li>
+        </ol>
+        <p class="fine">See <code>train.py</code> to train and evaluate the model.</p>
+      </div>
+    </section>
+
+    <section class="chapter outro" id="outro" data-chapter="outro">
+      <div class="card">
+        <p class="eyebrow">Your turn</p>
+        <h2>Pick any spot on Earth</h2>
+        <p>
+          Scroll to zoom right down to real satellite imagery, click a satellite to learn what
+          it does, or click the ground to see which satellites are overhead right now.
+        </p>
+        <button class="btn btn-primary" type="button" data-enter-explore>Start exploring</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ── Explore mode UI ──────────────────────────────────────────────────── -->
+  <div class="explore-ui" aria-hidden="true">
+    <div class="explore-bar">
+      <button class="btn btn-ghost" id="exit-explore" type="button">← Back to story</button>
+      <div class="seg" role="group" aria-label="Simulation speed">
+        <button type="button" data-speed="1">1×</button>
+        <button type="button" data-speed="60" class="on">60×</button>
+        <button type="button" data-speed="600">600×</button>
+      </div>
+      <label class="toggle"><input type="checkbox" id="imagery-toggle" checked /> Satellite imagery</label>
+      <div class="zoom">
+        <button type="button" data-zoom="in" aria-label="Zoom in">+</button>
+        <button type="button" data-zoom="out" aria-label="Zoom out">−</button>
+      </div>
+    </div>
+    <p class="explore-hint">Scroll to zoom · drag to rotate · click the ground to fly there · click a dot for details</p>
+    <p class="attribution" id="attribution"></p>
+  </div>
+
+  <aside class="legend-panel" aria-label="Satellite categories">
+    <h3>Satellites by purpose</h3>
+    <ul data-legend data-interactive></ul>
+  </aside>
+
+  <aside class="info-panel" id="info" aria-live="polite" hidden></aside>
+
+  <div class="tooltip" id="tooltip" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/globe.gl@2.45.3/dist/globe.gl.min.js"></script>
+  <script src="js/satellites.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
