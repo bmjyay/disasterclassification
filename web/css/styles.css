@@ -57,17 +57,24 @@ body:not(.intro-done) .topbar, body:not(.intro-done) #story { opacity: 0; }
 
 /* ── Top bar ────────────────────────────────────────────────────────────── */
 .topbar {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 20;
-  display: flex; justify-content: center; align-items: center;
-  padding: 18px 32px;
-  background: linear-gradient(to bottom, rgba(7, 7, 8, 0.9), transparent);
+  position: fixed; top: 0; left: 0; right: 0; height: 64px; z-index: 20;
+  background: transparent; pointer-events: none;
 }
-.nav { display: flex; gap: 28px; }
+/* Pinned to the exact centre of the bar, independent of anything else in it. */
+.nav {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  display: flex; gap: 28px; pointer-events: auto;
+}
 .nav-link {
-  border: 0; background: none; padding: 4px 0; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+  border: 0; outline: 0; box-shadow: none; background: none; border-radius: 0;
+  margin: 0; padding: 4px 0; cursor: pointer; line-height: 1;
   font-size: 15px; letter-spacing: 0.08em; text-transform: lowercase;
   color: var(--muted); transition: color 0.2s;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+  -webkit-tap-highlight-color: transparent;
 }
+.nav-link:focus:not(:focus-visible) { outline: 0; }
 .nav-link:hover, .nav-link.on { color: var(--text); }
 
 /* ── Buttons ────────────────────────────────────────────────────────────── */
@@ -327,7 +334,7 @@ body.exploring .explore-ui > * { pointer-events: auto; }
 /* ── Small screens ──────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
   body { font-size: 17px; }
-  .topbar { padding: 14px 16px; }
+  .topbar { height: 56px; }
   .chapter { align-items: flex-end; padding: 80px 16px 32px; }
   .chapter.hero { align-items: center; background: linear-gradient(to bottom, transparent, rgba(7, 7, 8, 0.6) 30%, rgba(7, 7, 8, 0.6) 70%, transparent); }
   .card { width: 100%; padding: 20px; }
