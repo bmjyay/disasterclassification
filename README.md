@@ -111,6 +111,36 @@ With 15 epochs on a GPU (or ~45 min CPU):
 
 ---
 
+## Interactive Globe (web UI)
+
+`web/` is a static site that tells the story behind the model on a 3D globe:
+
+- **Particle Earth:** the planet is drawn from ~150k points sampled from a land mask, wrapped
+  in a faint web of orbit lines, with dust drifting off its edge. On load, the dust streams
+  in and condenses into the globe.
+- **Scroll story:** the camera flies to four real events (Cyclone Mocha, the Türkiye–Syria
+  earthquakes, the 2022 Pakistan floods and the Lahaina fire) and highlights the satellites
+  that observed each one.
+- **Color-coded satellites:** ~40 representative spacecraft drawn by purpose: optical/thermal,
+  radar (SAR), weather, communications, navigation and crewed stations. Click any dot (or a
+  chip in the story) for its purpose, instruments, orbit and role in disasters, then
+  **Follow** it around the planet.
+- **Explore mode:** scroll to zoom, drag to rotate, and click anywhere to fly there. Zoom in
+  close and the particles give way to real satellite imagery (Esri World Imagery), and the panel lists which
+  satellites are above the horizon and whether it is day or night at that spot.
+
+Run it with any static server:
+```bash
+cd web
+python -m http.server 8000   # then open http://localhost:8000
+```
+
+Built with [globe.gl](https://github.com/vasturiano/globe.gl) loaded from a CDN, so there
+is no build step. Satellite altitudes and inclinations are real, but orbit planes and
+phases are illustrative, so positions are representative rather than live tracking.
+
+---
+
 ## Hardware Notes
 - **GPU (recommended):** ~8–12 min total training time
 - **CPU only:** ~40–60 min; reduce `--batch-size 16` if memory is tight
