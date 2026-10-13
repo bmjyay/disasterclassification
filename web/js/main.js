@@ -251,14 +251,6 @@
 
   // ── Story chapters ──────────────────────────────────────────────────────
   const chapterEls = [...document.querySelectorAll("[data-chapter]")];
-  const progress = document.querySelector(".progress");
-  for (const el of chapterEls) {
-    const a = document.createElement("a");
-    a.href = `#${el.id}`;
-    a.dataset.target = el.dataset.chapter;
-    a.setAttribute("aria-label", el.querySelector("h1, h2").textContent);
-    progress.appendChild(a);
-  }
 
   // Satellite chips for each disaster chapter.
   for (const el of chapterEls) {
@@ -284,7 +276,6 @@
     if (state.exploring || state.chapter === name) return;
     state.chapter = name;
     const cfg = CHAPTERS[name];
-    for (const a of progress.children) a.classList.toggle("on", a.dataset.target === name);
     for (const el of chapterEls) el.classList.toggle("active", el.dataset.chapter === name);
 
     state.selected = null;
@@ -462,6 +453,7 @@
     storyScroll = window.scrollY;
     state.exploring = true;
     document.body.classList.add("exploring");
+    syncNav();
     exploreUi.setAttribute("aria-hidden", "false");
     controls.enableZoom = true;
     controls.autoRotate = false;
@@ -478,6 +470,7 @@
   function exitExplore() {
     state.exploring = false;
     document.body.classList.remove("exploring");
+    syncNav();
     exploreUi.setAttribute("aria-hidden", "true");
     controls.enableZoom = false;
     closeInfo();
@@ -489,8 +482,19 @@
     activateChapter(name || "hero");
   }
 
-  document.getElementById("explore-btn").addEventListener("click", () =>
-    state.exploring ? exitExplore() : enterExplore());
+  const homeBtn = document.getElementById("home-btn");
+  const exploreBtn = document.getElementById("explore-btn");
+  function syncNav() {
+    homeBtn.classList.toggle("on", !state.exploring);
+    exploreBtn.classList.toggle("on", state.exploring);
+    homeBtn.setAttribute("aria-current", String(!state.exploring));
+    exploreBtn.setAttribute("aria-current", String(state.exploring));
+  }
+  homeBtn.addEventListener("click", () => {
+    if (state.exploring) exitExplore();
+    window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+  });
+  exploreBtn.addEventListener("click", () => { if (!state.exploring) enterExplore(); });
   document.getElementById("exit-explore").addEventListener("click", exitExplore);
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
