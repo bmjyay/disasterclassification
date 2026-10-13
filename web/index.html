@@ -19,8 +19,10 @@
       <span class="brand-mark" aria-hidden="true"></span>
       Disaster Watch
     </a>
-    <nav class="progress" aria-label="Story chapters"></nav>
-    <button class="btn btn-ghost" id="explore-btn" type="button">Explore the globe</button>
+    <nav class="nav" aria-label="Main">
+      <button class="btn btn-ghost on" id="home-btn" type="button">Home</button>
+      <button class="btn btn-ghost" id="explore-btn" type="button">Explore</button>
+    </nav>
   </header>
 
   <!-- ── Scroll story ─────────────────────────────────────────────────────── -->
@@ -28,7 +30,6 @@
     <section class="chapter hero" id="hero" data-chapter="hero">
       <div class="card hero-card">
         <p class="eyebrow">Aerial &amp; satellite calamity detection</p>
-        <h1>Hundreds of eyes in orbit.<br />One question: <em>what just happened down there?</em></h1>
         <p class="lede">
           Scroll to follow the satellites that watch for cyclones, earthquakes, floods and
           wildfires, and see how a ResNet-50 classifier turns their imagery into an answer.
