@@ -41,9 +41,9 @@ class Prediction:
     gradcam: str   # data URL (overlay)
 
 
-# A calm warm ramp for the attention overlay (transparent -> amber -> terracotta).
+# A restrained ivory-to-umber ramp for the attention overlay (no saturated "heatmap" hues).
 _RAMP = np.array(
-    [[244, 208, 120], [232, 150, 84], [196, 88, 58], [150, 46, 40]], dtype=np.float32
+    [[236, 228, 210], [214, 190, 152], [176, 136, 104], [122, 84, 66]], dtype=np.float32
 )
 
 

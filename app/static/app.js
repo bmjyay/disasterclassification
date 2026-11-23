@@ -1,4 +1,4 @@
-// Disaster Lens front-end. Plain JS, no build step, no animation.
+// OrbitWatch front-end. Plain JS, no build step, no animation.
 (() => {
   "use strict";
 

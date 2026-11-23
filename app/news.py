@@ -28,7 +28,7 @@ _TERMS = {
 
 CACHE_TTL = int(os.environ.get("NEWS_CACHE_TTL", 15 * 60))
 TIMEOUT = 8
-USER_AGENT = "DisasterLens/1.0 (+news panel)"
+USER_AGENT = "OrbitWatch/1.0 (+news panel)"
 
 
 class NewsError(RuntimeError):

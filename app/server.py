@@ -1,4 +1,4 @@
-"""FastAPI server for Disaster Lens.
+"""FastAPI server for OrbitWatch.
 
 Run with:
     uvicorn app.server:app --reload
@@ -21,7 +21,7 @@ from .news import CATEGORIES, NewsError, NewsService
 STATIC = Path(__file__).parent / "static"
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
-app = FastAPI(title="Disaster Lens", docs_url="/api/docs", openapi_url="/api/openapi.json")
+app = FastAPI(title="OrbitWatch", docs_url="/api/docs", openapi_url="/api/openapi.json")
 classifier = Classifier()
 news = NewsService()
 

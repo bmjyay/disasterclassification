@@ -72,7 +72,7 @@ python train.py --eval-only --checkpoint best_model.pth
 
 ---
 
-## Web App — Disaster Lens
+## Web App — OrbitWatch
 
 A calm, single-page interface for the classifier with a related-news feed.
 The design lives in Figma: https://www.figma.com/design/GJHwVd8FZcXvEcDm6sNXMc
