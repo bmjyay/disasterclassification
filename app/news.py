@@ -27,7 +27,9 @@ _TERMS = {
 }
 
 CACHE_TTL = int(os.environ.get("NEWS_CACHE_TTL", 15 * 60))
-TIMEOUT = 8
+TIMEOUT = 15
+# GDELT asks clients to send at most one request every 5 seconds.
+GDELT_MIN_INTERVAL = float(os.environ.get("GDELT_MIN_INTERVAL", 5.5))
 USER_AGENT = "OrbitWatch/1.0 (+news panel)"
 
 
@@ -68,7 +70,8 @@ def _get_json(url: str, headers: dict[str, str] | None = None) -> dict:
     except (urllib.error.URLError, TimeoutError) as e:
         raise NewsError("Could not reach the news provider") from e
     try:
-        return json.loads(body)
+        # strict=False: GDELT titles occasionally contain raw control characters.
+        return json.loads(body, strict=False)
     except json.JSONDecodeError as e:
         # GDELT answers rate-limit / query errors with plain text.
         raise NewsError(body.strip()[:200] or "Unexpected news response") from e
@@ -113,6 +116,29 @@ def _gdelt_time(s: str | None) -> str | None:
         return None
 
 
+_gdelt_gate = threading.Lock()
+_gdelt_last = 0.0
+
+
+def _gdelt_request(url: str) -> dict:
+    """Call GDELT no faster than its published rate limit, retrying once if told to slow down."""
+    global _gdelt_last
+    with _gdelt_gate:
+        for attempt in range(2):
+            wait = _gdelt_last + GDELT_MIN_INTERVAL - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
+            try:
+                return _get_json(url)
+            except NewsError as e:
+                if attempt == 0 and "limit requests" in str(e).lower():
+                    continue
+                raise
+            finally:
+                _gdelt_last = time.monotonic()
+    raise NewsError("News provider is rate-limiting requests")
+
+
 def _fetch_gdelt(category: str | None, limit: int) -> list[dict]:
     params = {
         "query": f"{_or_query(_terms_for(category))} sourcelang:english",
@@ -123,7 +149,7 @@ def _fetch_gdelt(category: str | None, limit: int) -> list[dict]:
         "maxrecords": str(min(limit * 3, 75)),
     }
     url = "https://api.gdeltproject.org/api/v2/doc/doc?" + urllib.parse.urlencode(params)
-    data = _get_json(url)
+    data = _gdelt_request(url)
     out = []
     for a in data.get("articles", []):
         title = (a.get("title") or "").strip()
@@ -174,7 +200,13 @@ class NewsService:
                 return hit[1]
 
         api_key = os.environ.get("NEWS_API_KEY")
-        items = _fetch_newsapi(category, limit, api_key) if api_key else _fetch_gdelt(category, limit)
+        try:
+            items = _fetch_newsapi(category, limit, api_key) if api_key else _fetch_gdelt(category, limit)
+        except NewsError:
+            fallback = self._fallback(category, limit)
+            if fallback is None:
+                raise
+            return fallback
         result = {
             "category": category or "all",
             "provider": self.provider,
@@ -184,3 +216,21 @@ class NewsService:
         with self._lock:
             self._cache[key] = (now, result)
         return result
+
+    def _fallback(self, category: str | None, limit: int) -> dict | None:
+        """Serve the last good stories when the provider fails: same query first,
+        otherwise cached "all" stories filtered to the requested category."""
+        with self._lock:
+            entries = [(k, v) for k, v in self._cache.items() if k[0] == self.provider]
+        same = [v for k, (_, v) in entries if k[1] == category]
+        if same:
+            return {**same[0], "stale": True}
+        if category:
+            pool = [a for k, (_, v) in entries if k[1] is None for a in v["articles"] if a.get("category") == category]
+            if pool:
+                return {
+                    "category": category, "provider": self.provider, "stale": True,
+                    "fetched_at": datetime.now(timezone.utc).isoformat(),
+                    "articles": _dedupe(pool, limit),
+                }
+        return None

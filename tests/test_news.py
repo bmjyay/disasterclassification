@@ -13,6 +13,11 @@ GDELT = {"articles": [
 ]}
 
 
+@pytest.fixture(autouse=True)
+def no_pacing(monkeypatch):
+    monkeypatch.setattr(news, "GDELT_MIN_INTERVAL", 0)
+
+
 @pytest.fixture
 def svc(monkeypatch):
     monkeypatch.delenv("NEWS_API_KEY", raising=False)
@@ -59,3 +64,41 @@ def test_newsapi_used_when_key_set(monkeypatch):
     assert seen["headers"] == {"X-Api-Key": "test"}
     assert [a["title"] for a in out["articles"]] == ["Wildfire spreads"]
     assert out["articles"][0]["summary"] == "Crews respond."
+
+
+def test_rate_limit_retry_and_stale_fallback(monkeypatch):
+    monkeypatch.delenv("NEWS_API_KEY", raising=False)
+    monkeypatch.setattr(news.time, "sleep", lambda s: None)
+    replies = iter([news.NewsError("Please limit requests to one every 5 seconds"), GDELT])
+
+    def flaky(url, headers=None):
+        r = next(replies)
+        if isinstance(r, Exception):
+            raise r
+        return r
+
+    monkeypatch.setattr(news, "_get_json", flaky)
+    svc = news.NewsService()
+    out = svc.get(None)  # first call is rate-limited, the retry succeeds
+    assert out["articles"] and "stale" not in out
+
+    def down(url, headers=None):
+        raise news.NewsError("Could not reach the news provider")
+
+    monkeypatch.setattr(news, "_get_json", down)
+    monkeypatch.setattr(news, "CACHE_TTL", 0)
+    assert svc.get(None)["stale"] is True  # same query served from the last good result
+    cyc = svc.get("cyclone")  # never fetched: filtered from cached "all" stories
+    assert cyc["stale"] is True and [x["category"] for x in cyc["articles"]] == ["cyclone"]
+
+
+def test_error_when_nothing_cached(monkeypatch):
+    monkeypatch.delenv("NEWS_API_KEY", raising=False)
+    monkeypatch.setattr(news.time, "sleep", lambda s: None)
+
+    def down(url, headers=None):
+        raise news.NewsError("Could not reach the news provider")
+
+    monkeypatch.setattr(news, "_get_json", down)
+    with pytest.raises(news.NewsError):
+        news.NewsService().get("wildfire")

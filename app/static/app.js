@@ -375,7 +375,7 @@
       renderJournal(articles, category);
       if (category === "all") els.storyCount.textContent = String(articles.length).padStart(2, "0");
       const name = data.provider === "newsapi" ? "NewsAPI" : "GDELT";
-      els.newsProvider.textContent = `Via ${name}`;
+      els.newsProvider.textContent = data.stale ? `Via ${name} · saved stories` : `Via ${name}`;
     } catch {
       if (req !== newsRequest) return;
       els.newsProvider.textContent = "";
