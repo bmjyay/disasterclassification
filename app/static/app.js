@@ -1,13 +1,20 @@
-// OrbitWatch front-end. Plain JS, no build step, no animation.
+// OrbitWatch front-end. Plain JS, no build step.
+// Motion is tied to the visitor's own scrolling, dragging and clicking; the only
+// self-running effects are the upload ripples (on hover, drag and drop), and those
+// are switched off for visitors who prefer reduced motion.
 (() => {
   "use strict";
 
   const CLASSES = ["cyclone", "earthquake", "flood", "wildfire"];
   const MAX_BYTES = 10 * 1024 * 1024;
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const $ = (id) => document.getElementById(id);
+  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+  const smooth = (t) => { t = clamp(t); return t * t * (3 - 2 * t); };
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const pct = (p) => (p * 100).toFixed(1) + "%";
 
   const els = {
-    status: $("status"),
     form: $("upload-form"),
     input: $("file-input"),
     dropzone: $("dropzone"),
@@ -15,6 +22,7 @@
     preview: $("dropzone-preview"),
     previewImg: $("preview-img"),
     previewName: $("preview-name"),
+    ripples: $("ripples"),
     classifyBtn: $("classify-btn"),
     result: $("result"),
     predLabel: $("pred-label"),
@@ -27,52 +35,48 @@
     grid: $("news-grid"),
     newsSub: $("news-sub"),
     newsProvider: $("news-provider"),
-    footerProvider: $("footer-provider"),
-    tpl: $("news-card-tpl"),
+    storyCount: $("story-count"),
+    radarTpl: $("radar-item-tpl"),
+    widget: $("float-widget"),
+    widgetThumb: $("float-thumb"),
+    widgetKicker: $("float-kicker"),
+    widgetTitle: $("float-title"),
+    widgetAction: $("float-action"),
   };
 
   let selectedFile = null;
   let previewUrl = null;
   let newsRequest = 0;
+  let globeRef = null;
+  let lastPrediction = null;
 
-  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-  const pct = (p) => (p * 100).toFixed(1) + "%";
-
-  // ── Status ────────────────────────────────────────────────
-  function setStatus(state, label) {
-    els.status.dataset.state = state;
-    els.status.querySelector(".status-label").textContent = label;
-  }
-
-  async function checkHealth() {
-    try {
-      const res = await fetch("/api/health");
-      const data = await res.json();
-      if (data.model_ready) setStatus("ready", "Model ready");
-      else setStatus("missing", "No model loaded");
-      const name = data.news_provider === "newsapi" ? "NewsAPI" : "GDELT";
-      els.footerProvider.textContent = `News via ${name}`;
-    } catch {
-      setStatus("error", "Server unreachable");
+  // ── Theme (day / night) ───────────────────────────────────
+  const root = document.documentElement;
+  const toggle = $("mode-toggle");
+  function applyTheme(theme, persist) {
+    root.dataset.theme = theme;
+    const next = theme === "day" ? "night" : "day";
+    toggle.setAttribute("aria-label", `Switch to ${next} mode`);
+    toggle.title = `Switch to ${next} mode`;
+    if (persist) { try { localStorage.setItem("ow-theme", theme); } catch (e) {} }
+    if (globeRef) {
+      const cs = getComputedStyle(root);
+      globeRef.setTheme({ dot: cs.getPropertyValue("--globe-dot").trim(), labelBg: cs.getPropertyValue("--globe-label").trim() });
     }
   }
+  toggle.addEventListener("click", () => applyTheme(root.dataset.theme === "day" ? "night" : "day", true));
+  applyTheme(root.dataset.theme || "day", false);
 
   // ── Probability rows ──────────────────────────────────────
   function renderProbabilities(probs) {
-    const entries = probs
-      ? Object.entries(probs).sort((a, b) => b[1] - a[1])
-      : CLASSES.map((c) => [c, 0]);
+    const entries = probs ? Object.entries(probs).sort((a, b) => b[1] - a[1]) : CLASSES.map((c) => [c, 0]);
     els.probs.replaceChildren(
       ...entries.map(([cls, p], i) => {
         const li = document.createElement("li");
         li.className = "prob";
         li.dataset.class = cls;
         if (probs && i === 0) li.dataset.top = "true";
-        li.innerHTML = `
-          <div class="prob-labels">
-            <span class="label-m"></span>
-            <span class="mono-m"></span>
-          </div>
+        li.innerHTML = `<div class="prob-labels"><span class="label-m"></span><span class="mono-m"></span></div>
           <div class="prob-track" role="presentation"><div class="prob-bar"></div></div>`;
         li.querySelector(".label-m").textContent = cls;
         li.querySelector(".mono-m").textContent = probs ? pct(p) : "—";
@@ -88,18 +92,62 @@
     els.notice.hidden = false;
   }
 
-  function resetResult(message = "Awaiting an image") {
+  function resetResult(label = "Awaiting an image", sub = "Choose a photograph above to see what the model makes of it.") {
     els.result.dataset.state = "empty";
     els.result.style.removeProperty("--pred");
-    els.predLabel.textContent = "—";
-    els.predConf.textContent = message;
+    els.predLabel.textContent = label;
+    els.predConf.textContent = sub;
     els.notice.hidden = true;
     renderProbabilities(null);
-    for (const img of [els.imgOriginal, els.imgGradcam]) {
-      img.hidden = true;
-      img.removeAttribute("src");
-    }
+    for (const img of [els.imgOriginal, els.imgGradcam]) { img.hidden = true; img.removeAttribute("src"); }
   }
+
+  // ── Ripples ───────────────────────────────────────────────
+  els.ripples.innerHTML = "<i></i><i></i><i></i>";
+  function burst() {
+    if (reduceMotion) return;
+    els.ripples.classList.remove("burst");
+    void els.ripples.offsetWidth; // restart the one-shot animation
+    els.ripples.classList.add("burst");
+    setTimeout(() => els.ripples.classList.remove("burst"), 2200);
+  }
+
+  // ── Floating widget ───────────────────────────────────────
+  let predictionVisible = false;
+  function setWidget(state) {
+    els.widget.dataset.state = state;
+    if (state === "ready") {
+      els.widgetKicker.textContent = "Ready";
+      els.widgetTitle.textContent = selectedFile ? selectedFile.name : "Your image";
+      els.widgetAction.textContent = "Classify";
+    } else if (state === "loading") {
+      els.widgetKicker.textContent = "Analysing";
+      els.widgetTitle.textContent = "Reading the scene…";
+      els.widgetAction.textContent = "View";
+    } else if (state === "done" && lastPrediction) {
+      els.widgetKicker.textContent = "Prediction";
+      els.widgetTitle.textContent = `${cap(lastPrediction.label)} · ${pct(lastPrediction.confidence)}`;
+      els.widgetAction.textContent = "View ↓";
+    } else if (state === "error") {
+      els.widgetKicker.textContent = "No prediction";
+      els.widgetTitle.textContent = "See the note below";
+      els.widgetAction.textContent = "View ↓";
+    }
+    updateWidgetVisibility();
+  }
+  let widgetDismissed = false;
+  function updateWidgetVisibility() {
+    els.widget.hidden = !selectedFile || predictionVisible || widgetDismissed;
+  }
+  $("float-close").addEventListener("click", () => { widgetDismissed = true; updateWidgetVisibility(); });
+  els.widgetAction.addEventListener("click", () => {
+    if (els.widget.dataset.state === "ready") els.form.requestSubmit();
+    else $("prediction").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
+  });
+  new IntersectionObserver((entries) => {
+    predictionVisible = entries[0].isIntersecting;
+    updateWidgetVisibility();
+  }, { threshold: 0.25 }).observe($("prediction"));
 
   // ── File selection ────────────────────────────────────────
   function selectFile(file) {
@@ -116,26 +164,23 @@
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = URL.createObjectURL(file);
     els.previewImg.src = previewUrl;
+    els.widgetThumb.src = previewUrl;
     els.previewName.textContent = file.name;
     els.empty.hidden = true;
     els.preview.hidden = false;
     els.classifyBtn.disabled = false;
-    resetResult("Ready to classify");
+    resetResult("Ready when you are", "Press Classify image to read this scene.");
+    burst();
+    widgetDismissed = false;
+    setWidget("ready");
   }
 
   els.input.addEventListener("change", () => selectFile(els.input.files[0]));
-
   for (const type of ["dragenter", "dragover"]) {
-    els.dropzone.addEventListener(type, (e) => {
-      e.preventDefault();
-      els.dropzone.dataset.drag = "true";
-    });
+    els.dropzone.addEventListener(type, (e) => { e.preventDefault(); els.dropzone.dataset.drag = "true"; });
   }
   for (const type of ["dragleave", "drop"]) {
-    els.dropzone.addEventListener(type, (e) => {
-      e.preventDefault();
-      els.dropzone.dataset.drag = "false";
-    });
+    els.dropzone.addEventListener(type, (e) => { e.preventDefault(); els.dropzone.dataset.drag = "false"; });
   }
   els.dropzone.addEventListener("drop", (e) => selectFile(e.dataTransfer.files[0]));
 
@@ -143,37 +188,38 @@
   els.form.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!selectedFile) return;
-
     els.classifyBtn.disabled = true;
     els.classifyBtn.textContent = "Classifying…";
     els.result.dataset.state = "loading";
-    els.predConf.textContent = "Analysing image…";
+    els.predLabel.textContent = "Reading the scene…";
+    els.predConf.textContent = "This takes a moment on a CPU.";
     els.notice.hidden = true;
+    setWidget("loading");
 
     const body = new FormData();
     body.append("file", selectedFile);
-
     try {
       const res = await fetch("/api/predict", { method: "POST", body });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        resetResult("No prediction");
+        resetResult("No prediction", "The image could not be classified.");
         if (res.status === 503) {
-          showNotice(
-            "No trained model is loaded yet. Run <code>python train.py</code> to create " +
-              "<code>best_model.pth</code>, then restart the server."
-          );
-          setStatus("missing", "No model loaded");
+          showNotice("No trained model is loaded yet. Run <code>python train.py</code> to create <code>best_model.pth</code>, then restart the server.");
         } else {
           showNotice(escapeHtml(data.detail || "Something went wrong while classifying."), "error");
         }
+        setWidget("error");
         return;
       }
+      lastPrediction = data;
+      widgetDismissed = false;
       renderPrediction(data);
+      setWidget("done");
       setNewsCategory(data.label, { fromPrediction: true });
     } catch {
-      resetResult("No prediction");
+      resetResult("No prediction", "The server could not be reached.");
       showNotice("Couldn't reach the server. Check that it is running and try again.", "error");
+      setWidget("error");
     } finally {
       els.classifyBtn.disabled = false;
       els.classifyBtn.textContent = "Classify image";
@@ -194,7 +240,7 @@
     els.imgGradcam.hidden = false;
   }
 
-  // ── News ──────────────────────────────────────────────────
+  // ── Journal (news) ────────────────────────────────────────
   function relativeTime(iso) {
     if (!iso) return "";
     const diff = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -204,45 +250,54 @@
     if (diff < 86400 * 7) return `${Math.round(diff / 86400)}d ago`;
     return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   }
-
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   }
-
   function safeUrl(u) {
-    try {
-      const url = new URL(u);
-      return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
-    } catch {
-      return null;
+    try { const url = new URL(u); return url.protocol === "http:" || url.protocol === "https:" ? url.href : null; }
+    catch { return null; }
+  }
+  function el(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function mediaFor(article, cls, captionText) {
+    const box = el("a", "feature-media");
+    box.href = safeUrl(article.url);
+    box.target = "_blank";
+    box.rel = "noopener noreferrer";
+    const tile = el("span", "tile");
+    tile.dataset.class = cls || "flood";
+    box.append(tile);
+    const img = safeUrl(article.image);
+    if (img) {
+      const im = el("img");
+      im.alt = "";
+      im.loading = "lazy";
+      im.referrerPolicy = "no-referrer";
+      im.src = img;
+      im.addEventListener("error", () => im.remove(), { once: true });
+      box.append(im);
     }
+    const cap = el("span", "media-caption");
+    cap.append(el("span", null, captionText), el("span", null, "↗"));
+    box.append(cap);
+    return box;
   }
 
   function renderSkeleton() {
     els.grid.setAttribute("aria-busy", "true");
-    els.grid.replaceChildren(
-      ...Array.from({ length: 3 }, () => {
-        const d = document.createElement("div");
-        d.className = "news-skeleton";
-        d.setAttribute("aria-hidden", "true");
-        d.innerHTML = "<span></span><span></span><span></span><span></span>";
-        return d;
-      })
-    );
+    const col = () => { const d = el("div", "skeleton"); d.style.minHeight = "420px"; return d; };
+    els.grid.replaceChildren(col(), col(), col());
   }
-
   function renderNewsEmpty(message, retry) {
-    const box = document.createElement("div");
-    box.className = "news-empty";
-    const p = document.createElement("p");
-    p.className = "body-m";
-    p.textContent = message;
-    box.append(p);
+    const box = el("div", "news-empty");
+    box.append(el("p", null, message));
     if (retry) {
-      const b = document.createElement("button");
-      b.className = "btn btn-secondary";
+      const b = el("button", "btn btn-box", "Try again");
       b.type = "button";
-      b.textContent = "Try again";
       b.addEventListener("click", retry);
       box.append(b);
     }
@@ -250,40 +305,61 @@
     els.grid.setAttribute("aria-busy", "false");
   }
 
-  function renderNews(articles, category) {
-    const cards = [];
-    for (const a of articles) {
-      const href = safeUrl(a.url);
-      if (!href) continue;
-      const node = els.tpl.content.firstElementChild.cloneNode(true);
-      node.href = href;
-      const cls = a.category || (category !== "all" ? category : null);
-      const badge = node.querySelector(".badge");
-      if (cls) {
-        badge.dataset.class = cls;
-        badge.querySelector(".badge-label").textContent = cls;
-      } else {
-        badge.remove();
-      }
-      const meta = [a.source, relativeTime(a.published_at)].filter(Boolean).join(" · ");
-      node.querySelector(".news-source").textContent = meta;
-      node.querySelector(".news-title").textContent = a.title;
-      node.querySelector(".news-summary").textContent = a.summary || "";
-      const img = safeUrl(a.image);
+  function renderJournal(articles, category) {
+    const list = articles.filter((a) => safeUrl(a.url));
+    if (!list.length) { renderNewsEmpty("No recent stories for this category. Try another filter."); return; }
+    const [lead, ...rest] = list;
+    const leadCls = lead.category || (category !== "all" ? category : null);
+
+    const copy = el("div", "feature-copy");
+    copy.append(el("span", "eyebrow strong", "The big picture"));
+    const h = el("h3", "feature-title");
+    const a = el("a", null, lead.title);
+    a.href = safeUrl(lead.url); a.target = "_blank"; a.rel = "noopener noreferrer";
+    h.append(a);
+    copy.append(h);
+    copy.append(el("p", "feature-sum",
+      lead.summary || `Reported by ${lead.source || "a news outlet"}${lead.published_at ? `, ${relativeTime(lead.published_at)}` : ""}. Open the story for the full report.`));
+    const link = el("a", "feature-link", `Read on ${lead.source || "the source"}  →`);
+    link.href = safeUrl(lead.url); link.target = "_blank"; link.rel = "noopener noreferrer";
+    copy.append(link);
+    const foot = el("div", "feature-foot");
+    foot.append(el("span", null, lead.source || "News"), el("span", null, leadCls ? cap(leadCls) : "Natural hazards"));
+    copy.append(foot);
+
+    const media = mediaFor(lead, leadCls, "A shift in perspective");
+
+    const radar = el("div", "radar");
+    const head = el("div", "radar-head");
+    const shown = rest.slice(0, 3);
+    head.append(el("span", "eyebrow strong", "On our radar"), el("span", "eyebrow", shown.length ? `01 — 0${shown.length}` : ""));
+    radar.append(head);
+    for (const item of shown) {
+      const node = els.radarTpl.content.firstElementChild.cloneNode(true);
+      node.href = safeUrl(item.url);
+      const cls = item.category || (category !== "all" ? category : null);
+      const thumb = node.querySelector(".radar-thumb");
+      const tile = el("span", "tile");
+      tile.dataset.class = cls || "flood";
+      tile.style.position = "absolute"; tile.style.inset = "0";
+      thumb.prepend(tile);
+      const img = safeUrl(item.image);
       if (img) {
-        const wrap = node.querySelector(".news-image");
-        const el = wrap.querySelector("img");
-        el.src = img;
-        el.addEventListener("error", () => wrap.remove(), { once: true });
-        wrap.hidden = false;
+        const im = node.querySelector("img");
+        im.src = img; im.hidden = false;
+        im.addEventListener("error", () => im.remove(), { once: true });
       }
-      cards.push(node);
+      node.querySelector(".radar-kicker").textContent = [cls ? cls + "s" : "News", item.source].filter(Boolean).join(" / ");
+      node.querySelector(".radar-title").textContent = item.title;
+      node.querySelector(".radar-time").textContent = relativeTime(item.published_at);
+      radar.append(node);
     }
-    if (!cards.length) {
-      renderNewsEmpty("No recent articles for this category. Try another filter.");
-      return;
-    }
-    els.grid.replaceChildren(...cards);
+    if (!shown.length) radar.append(el("p", "feature-sum", "More stories will appear here as they are reported."));
+    const note = el("p", "radar-note");
+    note.innerHTML = "A considered selection.<br>A broader understanding.";
+    radar.append(note);
+
+    els.grid.replaceChildren(copy, media, radar);
     els.grid.setAttribute("aria-busy", "false");
   }
 
@@ -293,53 +369,203 @@
     try {
       const res = await fetch(`/api/news?category=${encodeURIComponent(category)}&limit=9`);
       const data = await res.json().catch(() => ({}));
-      if (req !== newsRequest) return; // a newer request superseded this one
+      if (req !== newsRequest) return;
       if (!res.ok) throw new Error(data.detail || "News unavailable");
-      renderNews(data.articles || [], category);
+      const articles = data.articles || [];
+      renderJournal(articles, category);
+      if (category === "all") els.storyCount.textContent = String(articles.length).padStart(2, "0");
       const name = data.provider === "newsapi" ? "NewsAPI" : "GDELT";
-      const when = data.fetched_at
-        ? new Date(data.fetched_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
-        : "";
-      els.newsProvider.textContent = `Source: ${name}${when ? ` · fetched ${when}` : ""}`;
+      els.newsProvider.textContent = `Via ${name}`;
     } catch {
       if (req !== newsRequest) return;
       els.newsProvider.textContent = "";
-      renderNewsEmpty("News is unavailable right now. The provider may be rate-limiting requests.", () =>
-        loadNews(category)
-      );
+      renderNewsEmpty("The journal is unavailable right now. The news provider may be rate-limiting requests.", () => loadNews(category));
     }
   }
 
   function setNewsCategory(category, { fromPrediction = false } = {}) {
-    for (const chip of els.chips.querySelectorAll(".chip")) {
-      chip.setAttribute("aria-checked", String(chip.dataset.category === category));
-      chip.tabIndex = chip.dataset.category === category ? 0 : -1;
+    for (const t of els.chips.querySelectorAll(".tab")) {
+      t.setAttribute("aria-checked", String(t.dataset.category === category));
+      t.tabIndex = t.dataset.category === category ? 0 : -1;
     }
     els.newsSub.textContent =
       category === "all"
-        ? "Recent reporting on natural disasters. Classify an image to focus on its category."
+        ? "Recent reporting on cyclones, earthquakes, floods and wildfires. Classify an image to follow its category."
         : fromPrediction
-          ? `Recent reporting matching the predicted class — ${category}.`
+          ? `Recent reporting that matches your image: ${category === "flood" ? "floods" : category + "s"}.`
           : `Recent reporting on ${category === "flood" ? "floods" : category + "s"}.`;
     loadNews(category);
   }
-
   els.chips.addEventListener("click", (e) => {
-    const chip = e.target.closest(".chip");
-    if (chip) setNewsCategory(chip.dataset.category);
+    const t = e.target.closest(".tab");
+    if (t) setNewsCategory(t.dataset.category);
   });
-
-  // Arrow-key navigation inside the radiogroup.
   els.chips.addEventListener("keydown", (e) => {
     if (!["ArrowLeft", "ArrowRight"].includes(e.key)) return;
-    const chips = [...els.chips.querySelectorAll(".chip")];
-    const i = chips.indexOf(document.activeElement);
+    const tabs = [...els.chips.querySelectorAll(".tab")];
+    const i = tabs.indexOf(document.activeElement);
     if (i < 0) return;
     e.preventDefault();
-    const next = chips[(i + (e.key === "ArrowRight" ? 1 : chips.length - 1)) % chips.length];
+    const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
     next.focus();
     setNewsCategory(next.dataset.category);
   });
+
+  // ── Classify stage: zoom into the full stop, open the grid, assemble the control ──
+  function initClassifyStage() {
+    const sec = $("classify");
+    const stage = $("classify-stage");
+    const intro = $("intro-layer");
+    const period = $("period");
+    const portal = $("portal");
+    const canvas = $("assemble");
+    const ctx = canvas.getContext("2d");
+    if (reduceMotion) { sec.dataset.formed = "true"; return { formedOffset: () => sec.offsetTop }; }
+
+    let geo = null;
+    let particles = [];
+    let lastQ = -1;
+
+    function measure() {
+      intro.style.transform = "none";
+      const s = stage.getBoundingClientRect();
+      const p = period.getBoundingClientRect();
+      const i = intro.getBoundingClientRect();
+      // centre of the full stop's visible dot (lower part of the glyph box)
+      const px = p.left + p.width / 2 - s.left;
+      const py = p.top + p.height * 0.72 - s.top;
+      geo = {
+        px, py,
+        ox: px - (i.left - s.left), oy: py - (i.top - s.top),
+        maxR: Math.hypot(Math.max(px, s.width - px), Math.max(py, s.height - py)) + 4,
+      };
+      intro.style.transformOrigin = `${geo.ox}px ${geo.oy}px`;
+      buildParticles();
+    }
+
+    // Sample the formed control (icon ring, title, button) into dot targets.
+    function buildParticles() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const box = canvas.getBoundingClientRect();
+      if (!box.width) return;
+      canvas.width = Math.round(box.width * dpr);
+      canvas.height = Math.round(box.height * dpr);
+      const off = document.createElement("canvas");
+      off.width = Math.ceil(box.width); off.height = Math.ceil(box.height);
+      const o = off.getContext("2d");
+      o.fillStyle = "#000"; o.strokeStyle = "#000";
+      const targets = { ring: [], text: [], fill: [] };
+      const nodes = els.empty.querySelectorAll("[data-target]");
+      const rects = [];
+      for (const n of nodes) {
+        const r = n.getBoundingClientRect();
+        const x = r.left - box.left, y = r.top - box.top;
+        const kind = n.dataset.target;
+        o.clearRect(0, 0, off.width, off.height);
+        if (kind === "ring") {
+          o.lineWidth = 2; o.beginPath(); o.arc(x + r.width / 2, y + r.height / 2, r.width / 2 - 1, 0, Math.PI * 2); o.stroke();
+          o.lineWidth = 2; o.beginPath();
+          const cx = x + r.width / 2, cy = y + r.height / 2;
+          o.moveTo(cx, cy + 9); o.lineTo(cx, cy - 9); o.moveTo(cx - 6, cy - 3); o.lineTo(cx, cy - 9); o.lineTo(cx + 6, cy - 3); o.stroke();
+        } else if (kind === "text") {
+          const cs = getComputedStyle(n);
+          o.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+          o.textBaseline = "middle"; o.textAlign = "center";
+          o.fillText(n.textContent, x + r.width / 2, y + r.height / 2);
+        } else {
+          o.beginPath(); o.roundRect ? o.roundRect(x, y, r.width, r.height, 4) : o.rect(x, y, r.width, r.height); o.fill();
+        }
+        const data = o.getImageData(0, 0, off.width, off.height).data;
+        const step = kind === "fill" ? 5 : kind === "text" ? 3 : 3;
+        for (let yy = Math.max(0, Math.floor(y) - 4); yy < Math.min(off.height, y + r.height + 4); yy += step) {
+          for (let xx = Math.max(0, Math.floor(x) - 4); xx < Math.min(off.width, x + r.width + 4); xx += step) {
+            if (data[(yy * off.width + xx) * 4 + 3] > 120) targets[kind].push(xx, yy);
+          }
+        }
+        rects.push(r);
+      }
+      let seed = 11;
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      particles = [];
+      const add = (list, kind, keep) => {
+        for (let k = 0; k < list.length; k += 2) {
+          if (rnd() > keep) continue;
+          particles.push({
+            tx: list[k], ty: list[k + 1], kind,
+            sx: rnd() * box.width, sy: rnd() * box.height,
+            d: rnd() * 0.45, s: kind === "fill" ? 2.2 : 1.6,
+          });
+        }
+      };
+      add(targets.ring, "ring", 1);
+      add(targets.text, "text", Math.min(1, 1600 / Math.max(1, targets.text.length / 2)));
+      add(targets.fill, "fill", 1);
+      geo.dpr = dpr;
+    }
+
+    function drawDots(a) {
+      const { dpr } = geo;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (a <= 0 || a >= 1 || !els.preview.hidden) return;
+      const cs = getComputedStyle(root);
+      const ink = cs.getPropertyValue("--text").trim();
+      const acc = cs.getPropertyValue("--accent").trim();
+      for (const p of particles) {
+        const t = smooth((a - p.d) / (1 - 0.45));
+        const x = p.sx + (p.tx - p.sx) * t, y = p.sy + (p.ty - p.sy) * t;
+        ctx.globalAlpha = 0.25 + 0.75 * t;
+        ctx.fillStyle = p.kind === "fill" ? acc : ink;
+        ctx.fillRect(x, y, p.s, p.s);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function progress() {
+      const r = sec.getBoundingClientRect();
+      return clamp(-r.top / (sec.offsetHeight - window.innerHeight));
+    }
+
+    function paint() {
+      if (!geo) measure();
+      const q = progress();
+      if (q === lastQ) return;
+      lastQ = q;
+      const z = smooth((q - 0.04) / 0.42);
+      // zoom into the full stop
+      intro.style.transform = `scale(${1 + Math.pow(z, 2.2) * 26})`;
+      intro.style.opacity = String(1 - smooth((q - 0.16) / 0.22));
+      // the full stop opens into the grid
+      const rad = 3 + Math.pow(z, 2.4) * geo.maxR;
+      portal.style.clipPath = `circle(${rad}px at ${geo.px}px ${geo.py}px)`;
+      // the control assembles from dots
+      const a = clamp((q - 0.5) / 0.3);
+      drawDots(a);
+      const ui = smooth((a - 0.82) / 0.18);
+      els.empty.style.opacity = String(els.preview.hidden ? ui : 1);
+      [...els.empty.children].forEach((c) => (c.style.opacity = ""));
+      sec.dataset.formed = String(a >= 0.82 || !els.preview.hidden);
+      portal.style.pointerEvents = rad > 60 ? "auto" : "none";
+    }
+
+    window.addEventListener("scroll", paint, { passive: true });
+    window.addEventListener("resize", () => { geo = null; lastQ = -1; paint(); });
+    document.fonts && document.fonts.ready.then(() => { geo = null; lastQ = -1; paint(); });
+    paint();
+
+    return { formedOffset: () => sec.offsetTop + (sec.offsetHeight - window.innerHeight) * 0.9 };
+  }
+
+  // Links to #classify land on the formed upload control rather than the start of the zoom.
+  function bindClassifyLinks(stage) {
+    document.querySelectorAll('a[href="#classify"]').forEach((a) =>
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        window.scrollTo({ top: stage.formedOffset(), behavior: "auto" });
+        history.replaceState(null, "", "#classify");
+      })
+    );
+  }
 
   // ── Cover: globe + scroll chapters ───────────────────────
   function initCover() {
@@ -361,12 +587,16 @@
       onSelect: ({ lat, lon }) => {
         selection.hidden = false;
         selection.textContent = `Target · ${formatCoord(lat, lon)}`;
+        const pc = $("panel-coords");
+        if (pc) pc.textContent = formatCoord(lat, lon);
       },
     });
     globe.hotspots = chapters
       .filter((c) => c.dataset.hotspot)
       .map((c) => ({ id: c.dataset.hotspot, label: c.dataset.hotspot, lat: +c.dataset.lat, lon: +c.dataset.lon }));
     globe.load("/static/land-mask.bin").catch(() => canvas.remove());
+    globeRef = globe;
+    applyTheme(root.dataset.theme, false);
 
     // ── Gradient panel that grows out of the scroll-hint mouse ──
     const reveal = $("reveal");
@@ -474,8 +704,9 @@
 
   // ── Init ──────────────────────────────────────────────────
   initCover();
+  const stage = initClassifyStage();
+  bindClassifyLinks(stage);
   initHeader();
   resetResult();
-  checkHealth();
   setNewsCategory("all");
 })();

@@ -82,6 +82,7 @@
       this.selected = null;
       this.onSelect = onSelect;
       this.ready = false;
+      this.theme = { dot: "222, 232, 231", labelBg: "rgba(5, 6, 7, 0.82)" };
       this._raf = 0;
       this._tween = null;
       this._bindPointer();
@@ -106,6 +107,11 @@
       this.cx = narrow ? width / 2 : width * 0.68;
       this.cy = narrow ? height * 0.34 : height * 0.52;
       this.R = narrow ? Math.min(width * 0.4, height * 0.25) : Math.min(height * 0.34, width * 0.215);
+      this.draw();
+    }
+
+    setTheme(theme) {
+      Object.assign(this.theme, theme);
       this.draw();
     }
 
@@ -151,6 +157,7 @@
       if (!this.ready) return;
       const [cl, sl, cp, sp] = this._rot();
       const { cx, cy, R } = this;
+      const D = this.theme.dot;
       const proj = (X, Y, Z) => {
         const x1 = X * cl - Z * sl, z1 = X * sl + Z * cl;
         return [x1, Y * cp - z1 * sp, Y * sp + z1 * cp];
@@ -158,7 +165,7 @@
 
       // orbits (hidden where they pass behind Earth)
       ctx.lineWidth = 1;
-      ctx.strokeStyle = "rgba(214, 226, 225, 0.11)";
+      ctx.strokeStyle = `rgba(${D}, 0.11)`;
       ctx.beginPath();
       for (const pts of this.data.orbits) {
         let pen = false;
@@ -192,7 +199,7 @@
       for (let b = 0; b < BUCKETS; b++) {
         const list = buckets[b];
         if (!list.length) continue;
-        ctx.fillStyle = `rgba(222, 232, 231, ${((b + 0.5) / BUCKETS).toFixed(3)})`;
+        ctx.fillStyle = `rgba(${D}, ${((b + 0.5) / BUCKETS).toFixed(3)})`;
         ctx.beginPath();
         for (let i = 0; i < list.length; i += 3) ctx.rect(list[i], list[i + 1], list[i + 2], list[i + 2]);
         ctx.fill();
@@ -204,25 +211,25 @@
         if (z <= 0.05) continue;
         const sx = cx + x * R, sy = cy - y * R;
         const active = hs.id === this.activeHotspot;
-        ctx.strokeStyle = active ? "rgba(222, 232, 231, 0.95)" : "rgba(222, 232, 231, 0.4)";
-        ctx.fillStyle = active ? "#F2F5F4" : "rgba(222, 232, 231, 0.6)";
+        ctx.strokeStyle = active ? `rgba(${D}, 0.95)` : `rgba(${D}, 0.4)`;
+        ctx.fillStyle = active ? `rgb(${D})` : `rgba(${D}, 0.6)`;
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.arc(sx, sy, active ? 9 : 5, 0, Math.PI * 2); ctx.stroke();
         ctx.beginPath(); ctx.arc(sx, sy, 2, 0, Math.PI * 2); ctx.fill();
         if (active) {
           ctx.beginPath(); ctx.arc(sx, sy, 17, 0, Math.PI * 2);
-          ctx.strokeStyle = "rgba(222, 232, 231, 0.25)"; ctx.stroke();
-          ctx.font = '500 11px "IBM Plex Mono", ui-monospace, monospace';
+          ctx.strokeStyle = `rgba(${D}, 0.25)`; ctx.stroke();
+          ctx.font = '500 11px "DM Sans", system-ui, sans-serif';
           const coord = formatCoord(hs.lat, hs.lon);
           const bw = Math.max(ctx.measureText(hs.label.toUpperCase()).width, ctx.measureText(coord).width) + 16;
-          ctx.fillStyle = "rgba(5, 6, 7, 0.82)";
+          ctx.fillStyle = this.theme.labelBg;
           ctx.fillRect(sx + 16, sy - 17, bw, 34);
-          ctx.strokeStyle = "rgba(222, 232, 231, 0.35)";
+          ctx.strokeStyle = `rgba(${D}, 0.35)`;
           ctx.strokeRect(sx + 16.5, sy - 16.5, bw - 1, 33);
           ctx.beginPath(); ctx.moveTo(sx + 9, sy); ctx.lineTo(sx + 16, sy); ctx.stroke();
-          ctx.fillStyle = "rgba(242, 245, 244, 0.95)";
+          ctx.fillStyle = `rgba(${D}, 0.95)`;
           ctx.fillText(hs.label.toUpperCase(), sx + 24, sy - 4);
-          ctx.fillStyle = "rgba(222, 232, 231, 0.6)";
+          ctx.fillStyle = `rgba(${D}, 0.6)`;
           ctx.fillText(coord, sx + 24, sy + 11);
         }
       }
@@ -232,7 +239,7 @@
         const [x, y, z] = proj(...toWorld(this.selected.lat, this.selected.lon));
         if (z > 0) {
           const sx = cx + x * R, sy = cy - y * R;
-          ctx.strokeStyle = "rgba(242, 245, 244, 0.9)";
+          ctx.strokeStyle = `rgba(${D}, 0.9)`;
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(sx - 14, sy); ctx.lineTo(sx - 5, sy); ctx.moveTo(sx + 5, sy); ctx.lineTo(sx + 14, sy);
