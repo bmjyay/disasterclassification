@@ -72,6 +72,61 @@ python train.py --eval-only --checkpoint best_model.pth
 
 ---
 
+## Web App — Disaster Lens
+
+A calm, single-page interface for the classifier with a related-news feed.
+The design lives in Figma: https://www.figma.com/design/GJHwVd8FZcXvEcDm6sNXMc
+(tokens, components and the desktop screen; CSS custom properties in
+`app/static/styles.css` mirror the Figma variables one-to-one).
+
+- **Classify** – drag & drop or choose a photo; get the predicted class, per-class
+  probabilities and a Grad-CAM attention map next to the crop the model saw.
+- **Related news** – recent coverage filtered by category. After a prediction the feed
+  switches to the predicted class automatically.
+- **Static by design** – no transitions or motion; light and dark themes follow the OS.
+
+### Run it
+```bash
+pip install -r requirements.txt
+python train.py                      # produces best_model.pth (skip if you already have one)
+uvicorn app.server:app --reload      # then open http://localhost:8000
+```
+Without a checkpoint the UI still loads and the news feed works; classification shows
+a notice explaining how to train a model.
+
+### News provider
+| Setting | Provider |
+|---|---|
+| `NEWS_API_KEY` set | [NewsAPI](https://newsapi.org) `/v2/everything` (titles + descriptions + images) |
+| not set (default) | [GDELT DOC 2.0](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) – free, no key |
+
+```bash
+export NEWS_API_KEY=your_key_here   # optional
+```
+Results are cached in memory for 15 minutes (`NEWS_CACHE_TTL` seconds to change).
+
+### Configuration
+| Env var | Default | Purpose |
+|---|---|---|
+| `MODEL_CHECKPOINT` | `best_model.pth` | Path to trained weights |
+| `CLASS_NAMES` | `cyclone,earthquake,flood,wildfire` | Class order used in training (alphabetical folder order) |
+| `NEWS_API_KEY` | – | Use NewsAPI instead of GDELT |
+
+### API
+| Endpoint | Description |
+|---|---|
+| `GET /api/health` | Model availability, classes, news provider |
+| `POST /api/predict` | Multipart `file` → label, confidence, probabilities, Grad-CAM (data URLs) |
+| `GET /api/news?category=flood&limit=9` | Normalised articles: title, summary, url, source, published_at, image, category |
+| `GET /api/docs` | Interactive OpenAPI docs |
+
+### Tests
+```bash
+python -m pytest tests
+```
+
+---
+
 ## What the Code Does
 
 | Component | Details |
