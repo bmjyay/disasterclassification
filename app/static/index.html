@@ -41,36 +41,38 @@
       <div class="cover-stage">
         <canvas class="globe" id="globe" aria-label="Dotted globe showing disaster hotspots. Drag to rotate, click to fly to a location." role="img"></canvas>
 
-        <div class="cover-copy">
-          <article class="chapter" data-chapter="0" data-lat="18" data-lon="18">
+        <div class="reveal" id="reveal" aria-hidden="true"></div>
+
+        <div class="cover-copy" id="cover-copy">
+          <article class="chapter" data-chapter="0" data-lat="18" data-lon="18" data-active="true">
             <p class="overline">Aerial &amp; satellite calamity detection</p>
             <p class="cover-lead">Scroll to follow the satellites that watch for cyclones, earthquakes, floods and wildfires, and see how a ResNet-50 classifier turns their imagery into an answer.</p>
             <p class="cover-hint">
-              <svg width="16" height="26" viewBox="0 0 16 26" aria-hidden="true"><rect x="0.6" y="0.6" width="14.8" height="24.8" rx="7.4" fill="none" stroke="currentColor" stroke-width="1"/><line x1="8" y1="5" x2="8" y2="9" stroke="currentColor" stroke-width="1"/></svg>
+              <span class="mouse" id="mouse" aria-hidden="true"></span>
               <span class="hint-text">Scroll to begin, or click anywhere on Earth to fly there</span>
             </p>
           </article>
-          <article class="chapter" data-chapter="1" data-hotspot="cyclone" data-lat="17.5" data-lon="88.5" hidden>
+          <article class="chapter" data-chapter="1" data-hotspot="cyclone" data-lat="17.5" data-lon="88.5">
             <p class="overline"><span class="index">01</span> Cyclone · Bay of Bengal</p>
             <p class="cover-lead">Geostationary weather satellites image the Bay of Bengal every ten minutes. Spiralling cloud bands around a clear eye are the signature the model learns to recognise.</p>
             <p class="readout mono">17.5°N  88.5°E · Meteosat / INSAT</p>
           </article>
-          <article class="chapter" data-chapter="2" data-hotspot="earthquake" data-lat="37.2" data-lon="37" hidden>
+          <article class="chapter" data-chapter="2" data-hotspot="earthquake" data-lat="37.2" data-lon="37">
             <p class="overline"><span class="index">02</span> Earthquake · Kahramanmaraş</p>
             <p class="cover-lead">After an earthquake, damage hides in texture: collapsed roofs and rubble fields. It is the subtlest class, and the one most often confused with the others.</p>
             <p class="readout mono">37.2°N  37.0°E · WorldView / Pléiades</p>
           </article>
-          <article class="chapter" data-chapter="3" data-hotspot="flood" data-lat="26.5" data-lon="68" hidden>
+          <article class="chapter" data-chapter="3" data-hotspot="flood" data-lat="26.5" data-lon="68">
             <p class="overline"><span class="index">03</span> Flood · Indus basin</p>
             <p class="cover-lead">Floodwater spreads across farmland in flat, dark sheets. Radar satellites see it through cloud, so responders can map who is cut off within hours.</p>
             <p class="readout mono">26.5°N  68.0°E · Sentinel-1 SAR</p>
           </article>
-          <article class="chapter" data-chapter="4" data-hotspot="wildfire" data-lat="39.8" data-lon="-121.4" hidden>
+          <article class="chapter" data-chapter="4" data-hotspot="wildfire" data-lat="39.8" data-lon="-121.4">
             <p class="overline"><span class="index">04</span> Wildfire · Sierra Nevada</p>
             <p class="cover-lead">Smoke plumes, active fire fronts and blackened burn scars. Thermal sensors flag new fires; imagery like this confirms what is burning and where it is heading.</p>
             <p class="readout mono">39.8°N  121.4°W · Landsat 9 / VIIRS</p>
           </article>
-          <article class="chapter" data-chapter="5" data-lat="10" data-lon="40" hidden>
+          <article class="chapter" data-chapter="5" data-lat="10" data-lon="40">
             <p class="overline"><span class="index">05</span> Your turn</p>
             <p class="cover-lead">Bring an aerial or ground photograph. The model names the calamity, shows where it looked, and surfaces the latest reporting so you can follow the response.</p>
             <a class="btn btn-box" href="#classify">Classify an image</a>

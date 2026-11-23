@@ -368,6 +368,58 @@
       .map((c) => ({ id: c.dataset.hotspot, label: c.dataset.hotspot, lat: +c.dataset.lat, lon: +c.dataset.lon }));
     globe.load("/static/land-mask.bin").catch(() => canvas.remove());
 
+    // ── Gradient panel that grows out of the scroll-hint mouse ──
+    const reveal = $("reveal");
+    const mouse = $("mouse");
+    const copy = $("cover-copy");
+    const intro = chapters[0];
+    // base, base2, mid, core per chapter: intro, cyclone, earthquake, flood, wildfire, your turn
+    const PALETTES = [
+      ["#8F9C98", "#A9B3AE", "#C9C3AE", "#C48A78"],
+      ["#8C98A3", "#A8B2BA", "#C2C7CE", "#8E9DB4"],
+      ["#9A9387", "#B3AB9C", "#CFC4AE", "#A9826A"],
+      ["#8A9C99", "#A7B6B2", "#C3CEC8", "#7E9C9E"],
+      ["#9E978B", "#B8B0A0", "#D6C8AA", "#C08372"],
+      ["#8F9C98", "#A9B3AE", "#C9C3AE", "#C48A78"],
+    ].map((pal) => pal.map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))));
+    const mix = (a, b, t) => `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(",")})`;
+    let geo = null;
+    function measure() {
+      const stage = cover.querySelector(".cover-stage").getBoundingClientRect();
+      const m = mouse.getBoundingClientRect();
+      const c = copy.getBoundingClientRect();
+      const pad = window.innerWidth < 820 ? 20 : 44;
+      const left = Math.max(8, c.left - stage.left - pad);
+      geo = {
+        from: { x: m.left - stage.left + 2, y: m.top - stage.top + 2, w: m.width - 4, h: m.height - 4, r: 7 },
+        to: {
+          x: left, y: c.top - stage.top - pad,
+          w: Math.min(stage.width - left - 8, c.width + pad * 2), h: c.height + pad * 2, r: 3,
+        },
+      };
+    }
+    function paintReveal(p) {
+      if (!geo) measure();
+      const r = Math.max(0, Math.min(1, p / 0.7));
+      const e = window.DisasterGlobe.ease(r);
+      const { from: a, to: b } = geo;
+      const L = (k) => a[k] + (b[k] - a[k]) * e;
+      Object.assign(reveal.style, {
+        left: `${L("x")}px`, top: `${L("y")}px`, width: `${L("w")}px`, height: `${L("h")}px`,
+        borderRadius: `${L("r")}px`,
+      });
+      const i = Math.min(PALETTES.length - 2, Math.floor(p));
+      const t = Math.min(1, Math.max(0, p - i));
+      ["--base", "--base2", "--mid", "--core"].forEach((v, k) =>
+        reveal.style.setProperty(v, mix(PALETTES[i][k], PALETTES[i + 1][k], t))
+      );
+      // intro copy steps aside while the panel opens; chapter copy lands in ink once it has
+      intro.style.opacity = String(Math.max(0, 1 - r * 2.2));
+      cover.dataset.oncard = String(r > 0.55);
+    }
+    window.addEventListener("resize", () => { geo = null; lastProgress = -1; onScroll(); });
+    document.fonts && document.fonts.ready.then(() => { geo = null; lastProgress = -1; onScroll(); });
+
     let current = -1;
     let lastProgress = -1;
     function onScroll() {
@@ -382,17 +434,18 @@
       const a = stops[i], b = stops[i + 1];
       globe.setView(a.lat + (b.lat - a.lat) * f, a.lon + wrapLon(b.lon - a.lon) * f);
 
+      paintReveal(p);
+
       const idx = Math.round(p);
       if (idx !== current) {
         current = idx;
-        chapters.forEach((c, k) => (c.hidden = k !== idx));
+        chapters.forEach((c, k) => (c.dataset.active = String(k === idx)));
         ticks.forEach((t, k) => (t.dataset.active = String(k === idx)));
         globe.activeHotspot = stops[idx].hotspot || null;
         globe.draw();
       }
     }
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
     onScroll();
   }
 

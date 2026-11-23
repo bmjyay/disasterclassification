@@ -138,11 +138,50 @@ button { font: inherit; color: inherit; }
   width: min(620px, 37vw);
   pointer-events: none;
 }
+.cover-copy { z-index: 2; display: grid; }
 .cover-copy a { pointer-events: auto; }
-.chapter { display: grid; gap: var(--s24); }
+/* chapters share one grid cell so the copy block keeps the height of the tallest */
+.chapter { grid-area: 1 / 1; display: grid; gap: var(--s24); align-content: center; visibility: hidden; }
+.chapter[data-active="true"] { visibility: visible; }
 .cover-lead { font: 400 27px/1.65 var(--serif); color: var(--text); }
 .cover-hint { display: flex; align-items: center; gap: var(--s16); color: var(--text-muted); font-size: 19px; margin-top: var(--s16); }
 .readout { color: var(--signal); }
+
+/* Scroll hint: the mouse is a window onto the gradient panel below. */
+.mouse {
+  position: relative; flex: none;
+  width: 18px; height: 28px; border-radius: 9px;
+  border: 1px solid var(--text-muted);
+}
+.mouse::after {
+  content: ""; position: absolute; left: 50%; top: 5px; width: 1px; height: 5px;
+  background: rgba(12, 14, 15, 0.7);
+}
+
+/* The panel grows from inside the mouse as the visitor scrolls (geometry set in app.js). */
+.reveal {
+  position: absolute; z-index: 1; left: 0; top: 0; width: 0; height: 0;
+  border-radius: 8px; overflow: hidden; pointer-events: none;
+  --base: #8F9C98; --base2: #A9B3AE; --mid: #C9C3AE; --core: #C48A78;
+  background:
+    radial-gradient(ellipse 46% 52% at 40% 46%, var(--core) 0%, color-mix(in srgb, var(--core) 45%, var(--mid)) 34%, transparent 78%),
+    radial-gradient(ellipse 75% 85% at 72% 62%, var(--mid) 0%, transparent 72%),
+    linear-gradient(125deg, var(--base) 0%, var(--base2) 100%);
+}
+/* faint pixel grain, like an enlarged satellite tile */
+.reveal::after {
+  content: ""; position: absolute; inset: 0;
+  background-image: radial-gradient(rgba(10, 12, 13, 0.10) 0.7px, transparent 0.8px);
+  background-size: 3px 3px;
+}
+
+/* Copy that sits on the panel switches to ink. */
+.cover[data-oncard="true"] .chapter:not([data-chapter="0"]) .cover-lead { color: #0C0F10; }
+.cover[data-oncard="true"] .chapter:not([data-chapter="0"]) .overline { color: rgba(12, 15, 16, 0.72); }
+.cover[data-oncard="true"] .chapter:not([data-chapter="0"]) .overline .index { color: rgba(12, 15, 16, 0.9); }
+.cover[data-oncard="true"] .chapter:not([data-chapter="0"]) .readout { color: rgba(12, 15, 16, 0.75); }
+.cover[data-oncard="true"] .btn-box { color: #0C0F10; border-color: #0C0F10; }
+.cover[data-oncard="true"] .btn-box:hover { background: #0C0F10; color: var(--ice); }
 .chapter-ticks {
   position: absolute; left: 40px; top: 50%; translate: 0 -50%;
   list-style: none; padding: 0; display: grid; gap: 10px;
