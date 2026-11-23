@@ -733,7 +733,25 @@
     update();
   }
 
+  // ── "Scroll down" typed out next to the arrow ─────────────
+  function initTypewriter() {
+    const node = document.querySelector(".typewriter-text");
+    if (!node) return;
+    const word = "Scroll down";
+    if (reduceMotion) { node.textContent = word; return; }
+    let i = 0, dir = 1;
+    (function tick() {
+      i += dir;
+      node.textContent = word.slice(0, i);
+      let wait = dir > 0 ? 95 : 45;
+      if (i === word.length) { dir = -1; wait = 2200; }
+      else if (i === 0) { dir = 1; wait = 600; }
+      setTimeout(tick, wait);
+    })();
+  }
+
   // ── Init ──────────────────────────────────────────────────
+  initTypewriter();
   initCover();
   const stage = initClassifyStage();
   bindClassifyLinks(stage);

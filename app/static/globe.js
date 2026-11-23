@@ -219,7 +219,7 @@
         if (active) {
           ctx.beginPath(); ctx.arc(sx, sy, 17, 0, Math.PI * 2);
           ctx.strokeStyle = `rgba(${D}, 0.25)`; ctx.stroke();
-          ctx.font = '500 11px "DM Sans", system-ui, sans-serif';
+          ctx.font = '500 13px "EB Garamond", Garamond, serif';
           const coord = formatCoord(hs.lat, hs.lon);
           const bw = Math.max(ctx.measureText(hs.label.toUpperCase()).width, ctx.measureText(coord).width) + 16;
           ctx.fillStyle = this.theme.labelBg;

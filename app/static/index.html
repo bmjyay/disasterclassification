@@ -19,7 +19,7 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=EB+Garamond:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
@@ -67,27 +67,27 @@
             </p>
           </article>
           <article class="chapter" data-chapter="1" data-hotspot="cyclone" data-lat="17.5" data-lon="88.5">
-            <p class="overline"><span class="index">01</span> Cyclone · Bay of Bengal</p>
+            <p class="overline">Cyclone · Bay of Bengal</p>
             <p class="cover-lead">Geostationary weather satellites image the Bay of Bengal every ten minutes. Spiralling cloud bands around a clear eye are the signature the model learns to recognise.</p>
             <p class="readout mono">17.5°N  88.5°E · Meteosat / INSAT</p>
           </article>
           <article class="chapter" data-chapter="2" data-hotspot="earthquake" data-lat="37.2" data-lon="37">
-            <p class="overline"><span class="index">02</span> Earthquake · Kahramanmaraş</p>
+            <p class="overline">Earthquake · Kahramanmaraş</p>
             <p class="cover-lead">After an earthquake, damage hides in texture: collapsed roofs and rubble fields. It is the subtlest class, and the one most often confused with the others.</p>
             <p class="readout mono">37.2°N  37.0°E · WorldView / Pléiades</p>
           </article>
           <article class="chapter" data-chapter="3" data-hotspot="flood" data-lat="26.5" data-lon="68">
-            <p class="overline"><span class="index">03</span> Flood · Indus basin</p>
+            <p class="overline">Flood · Indus basin</p>
             <p class="cover-lead">Floodwater spreads across farmland in flat, dark sheets. Radar satellites see it through cloud, so responders can map who is cut off within hours.</p>
             <p class="readout mono">26.5°N  68.0°E · Sentinel-1 SAR</p>
           </article>
           <article class="chapter" data-chapter="4" data-hotspot="wildfire" data-lat="39.8" data-lon="-121.4">
-            <p class="overline"><span class="index">04</span> Wildfire · Sierra Nevada</p>
+            <p class="overline">Wildfire · Sierra Nevada</p>
             <p class="cover-lead">Smoke plumes, active fire fronts and blackened burn scars. Thermal sensors flag new fires; imagery like this confirms what is burning and where it is heading.</p>
             <p class="readout mono">39.8°N  121.4°W · Landsat 9 / VIIRS</p>
           </article>
           <article class="chapter" data-chapter="5" data-lat="10" data-lon="40">
-            <p class="overline"><span class="index">05</span> Your turn</p>
+            <p class="overline">Your turn</p>
             <p class="cover-lead">Bring an aerial or ground photograph. The model names the calamity, shows where it looked, and surfaces the latest reporting so you can follow the response.</p>
             <a class="btn btn-box" href="#classify">Classify an image</a>
           </article>
@@ -107,28 +107,19 @@
         <div class="orbit-arcs" aria-hidden="true"><span></span><span></span><span></span><span></span><i></i></div>
 
         <div class="intro-layer" id="intro-layer">
-          <span class="corner tl eyebrow">A different perspective</span>
-          <span class="corner tr eyebrow">01 — 04</span>
-          <span class="corner bl eyebrow">Four classes. One clearer picture.</span>
-          <span class="corner br eyebrow">Scroll to explore
-            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1v10M2 7l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1"/></svg></span>
           <div class="intro-center">
             <p class="eyebrow strong"><svg class="sparkle" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c.6 4.6 2.4 6.9 8 10-5.6 3.1-7.4 5.4-8 10-.6-4.6-2.4-6.9-8-10 5.6-3.1 7.4-5.4 8-10Z" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>Earth, seen with understanding</p>
-            <h2 class="hero-title" id="classify-title">Read a scene <span class="accent-word">from above.</span></h2>
+            <h2 class="visually-hidden" id="classify-title">Classify an image</h2>
             <p class="hero-sub">Upload a photograph to classify it as a cyclone, earthquake, flood or wildfire, and see where the model looked<span class="period" id="period">.</span></p>
-            <p class="hero-cue"><span class="cue-circle" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 1v12M2.5 8.5 7 13l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.1"/></svg></span>A little perspective changes everything</p>
+            <p class="hero-cue"><span class="cue-circle" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 1v12M2.5 8.5 7 13l4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.1"/></svg></span><span class="typewriter" aria-label="Scroll down"><span class="typewriter-text" aria-hidden="true">Scroll down</span></span></p>
           </div>
         </div>
 
         <div class="portal" id="portal">
           <div class="portal-inner container">
             <div class="section-bar">
-              <p class="section-tag"><span class="num">01</span>The image</p>
+              <p class="section-tag">The image</p>
               <a class="text-link" href="#prediction" id="jump-link">Jump to prediction <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h12M9 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.1"/></svg></a>
-            </div>
-            <div class="section-title-row">
-              <h3 class="section-title">Every image has <span class="accent-word">a story.</span></h3>
-              <p class="section-aside">Let's see the bigger picture.</p>
             </div>
 
             <form class="upload" id="upload-form" novalidate>
@@ -136,7 +127,7 @@
                 <input id="file-input" name="file" type="file" accept="image/jpeg,image/png,image/webp" class="visually-hidden">
                 <span class="panel-grid" aria-hidden="true"></span>
                 <span class="panel-tick tl" aria-hidden="true"></span><span class="panel-tick br" aria-hidden="true"></span>
-                <span class="panel-label left eyebrow">Image input / 001</span>
+                <span class="panel-label left eyebrow">Image input</span>
                 <span class="panel-label right eyebrow" id="panel-coords">00° 00′ N &nbsp; 00° 00′ E</span>
                 <span class="rings" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
                 <span class="ripples" id="ripples" aria-hidden="true"></span>
@@ -171,7 +162,7 @@
     <!-- 02 · Prediction -->
     <section id="prediction" class="prediction container" aria-labelledby="prediction-title">
       <div class="section-bar">
-        <p class="section-tag"><span class="num">02</span>The perspective</p>
+        <p class="section-tag">The perspective</p>
         <span class="eyebrow">A closer look</span>
       </div>
       <div class="result" id="result" aria-live="polite" data-state="empty">
@@ -250,32 +241,31 @@
 
     <!-- Field notes -->
     <section class="field-notes container" aria-labelledby="notes-title">
-      <p class="eyebrow">Look a little closer</p>
-      <h2 class="display" id="notes-title">The field <span class="accent-word">notes.</span></h2>
+      <h2 class="eyebrow" id="notes-title">Look a little closer</h2>
       <div class="notes-grid">
         <a class="note" href="https://www.nhc.noaa.gov/" target="_blank" rel="noopener noreferrer" data-class="cyclone">
-          <span class="note-tile"><span class="eyebrow">01 / Atmosphere</span></span>
+          <span class="note-tile"><span class="eyebrow">Atmosphere</span></span>
           <span class="note-meta"><span>Cyclones</span><span>Forecast centre</span></span>
           <span class="note-title">Inside the eye of a storm.</span>
           <span class="note-body">Advisories, cones of uncertainty and archived tracks for tropical cyclones in the Atlantic and eastern Pacific.</span>
           <span class="note-source">NOAA National Hurricane Center <span aria-hidden="true">→</span></span>
         </a>
         <a class="note" href="https://earthquake.usgs.gov/" target="_blank" rel="noopener noreferrer" data-class="earthquake">
-          <span class="note-tile"><span class="eyebrow">02 / Solid earth</span></span>
+          <span class="note-tile"><span class="eyebrow">Solid earth</span></span>
           <span class="note-meta"><span>Earthquakes</span><span>Live catalogue</span></span>
           <span class="note-title">A planet that never quite stands still.</span>
           <span class="note-body">Real-time earthquake maps, shaking intensity and impact estimates from the US Geological Survey.</span>
           <span class="note-source">USGS Earthquake Hazards <span aria-hidden="true">→</span></span>
         </a>
         <a class="note" href="https://floodobservatory.colorado.edu/" target="_blank" rel="noopener noreferrer" data-class="flood">
-          <span class="note-tile"><span class="eyebrow">03 / Water systems</span></span>
+          <span class="note-tile"><span class="eyebrow">Water systems</span></span>
           <span class="note-meta"><span>Floods</span><span>Satellite archive</span></span>
           <span class="note-title">When water finds a different path.</span>
           <span class="note-body">A global archive of large floods mapped from orbit, with extents, dates and affected regions.</span>
           <span class="note-source">Dartmouth Flood Observatory <span aria-hidden="true">→</span></span>
         </a>
         <a class="note" href="https://firms.modaps.eosdis.nasa.gov/" target="_blank" rel="noopener noreferrer" data-class="wildfire">
-          <span class="note-tile"><span class="eyebrow">04 / Changing land</span></span>
+          <span class="note-tile"><span class="eyebrow">Changing land</span></span>
           <span class="note-meta"><span>Wildfires</span><span>Observation tool</span></span>
           <span class="note-title">Seeing the signs through the smoke.</span>
           <span class="note-body">Active-fire detections from MODIS and VIIRS, available within hours of each satellite pass.</span>
@@ -295,8 +285,9 @@
         </div>
 
         <article class="research">
-          <p class="eyebrow strong">Research focus</p>
+          <p class="eyebrow strong">My research focus <span class="research-partner">In partnership with the Yale Humanitarian Research Lab</span></p>
           <h3 class="research-title">Finding casualties <span class="accent-word">during internet blackouts.</span></h3>
+          <p class="research-note">This is my personal research. Through a partnership with the Yale Humanitarian Research Lab, I have helped with some of the lab's processes for analysing imagery from conflict zones.</p>
           <p>Convolutional networks, trained partly on simulated scenes, flag where aerial and satellite images may show casualties when no reports can get out. Simulation fills the gaps that real, labelled conflict imagery can't ethically or practically supply. The model surfaces leads for trained analysts. It does not count the dead.</p>
           <figure class="flow" aria-label="Pipeline: simulate scenes, train the CNN, flag possible casualties, human verification. Verified flags feed back into training.">
             <ol class="flow-steps">
