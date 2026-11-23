@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Disaster Lens</title>
+  <meta name="description" content="Classify disaster imagery, see where the model looked, and read related news.">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#classify">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="Disaster Lens home">
+        <svg class="brand-mark" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
+          <rect width="28" height="28" rx="7" fill="var(--accent)"/>
+          <circle cx="14" cy="14" r="6" fill="none" stroke="var(--on-accent)" stroke-width="1.6"/>
+          <circle cx="14" cy="14" r="1.8" fill="var(--on-accent)"/>
+          <path d="M14 4.5v3M14 20.5v3M4.5 14h3M20.5 14h3" stroke="var(--on-accent)" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+        <span class="brand-name">Disaster Lens</span>
+      </a>
+      <nav class="nav" aria-label="Primary">
+        <a href="#classify" aria-current="true">Classify</a>
+        <a href="#news">News</a>
+        <a href="#about">About the model</a>
+      </nav>
+      <span class="status-pill" id="status" data-state="loading">
+        <span class="dot" aria-hidden="true"></span><span class="status-label">Checking model…</span>
+      </span>
+    </div>
+  </header>
+
+  <main>
+    <section class="intro container">
+      <p class="overline accent">Aerial &amp; ground imagery · ResNet-50</p>
+      <h1 class="display">Understand a disaster scene at a glance.</h1>
+      <p class="lede">Upload a photograph to classify it as a cyclone, earthquake, flood or wildfire, see where the model looked, and read related coverage.</p>
+    </section>
+
+    <section id="classify" class="workspace container" aria-label="Classifier">
+      <!-- 1 · Image -->
+      <form class="card" id="upload-form" novalidate>
+        <div class="card-title">
+          <p class="overline">1 · Image</p>
+          <h2 class="heading-l">Add a photograph</h2>
+        </div>
+
+        <label class="dropzone" id="dropzone" for="file-input">
+          <input id="file-input" name="file" type="file" accept="image/jpeg,image/png,image/webp" class="visually-hidden">
+          <span class="dropzone-empty" id="dropzone-empty">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 16.5V18a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1.5M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="label-m">Drop an aerial or ground photo here</span>
+            <span class="body-m subtle">JPG, PNG or WebP · up to 10 MB</span>
+            <span class="btn btn-secondary" aria-hidden="true">Choose file</span>
+          </span>
+          <span class="dropzone-preview" id="dropzone-preview" hidden>
+            <img id="preview-img" alt="Selected image preview">
+            <span class="preview-meta">
+              <span class="label-m" id="preview-name"></span>
+              <span class="label-s subtle">Click or drop to replace</span>
+            </span>
+          </span>
+        </label>
+
+        <div class="actions">
+          <button class="btn btn-primary" id="classify-btn" type="submit" disabled>Classify image</button>
+          <p class="body-m subtle">Images are processed on this server and never stored.</p>
+        </div>
+      </form>
+
+      <!-- 2 · Prediction -->
+      <section class="card result" id="result" aria-live="polite" data-state="empty">
+        <div class="card-title">
+          <p class="overline">2 · Prediction</p>
+          <div class="headline">
+            <h2 class="display" id="pred-label">—</h2>
+            <span class="mono-m muted" id="pred-confidence">Awaiting an image</span>
+          </div>
+        </div>
+
+        <p class="notice" id="result-notice" hidden></p>
+
+        <ul class="probabilities" id="probabilities">
+          <!-- rows rendered by app.js -->
+        </ul>
+
+        <hr class="divider">
+
+        <div class="attention">
+          <div class="attention-header">
+            <span class="label-m">Where the model looked</span>
+            <span class="label-s subtle">Grad-CAM · layer4</span>
+          </div>
+          <div class="attention-images">
+            <figure>
+              <div class="frame"><img id="img-original" alt="" hidden><span class="frame-empty">Original</span></div>
+              <figcaption class="label-s muted">Original</figcaption>
+            </figure>
+            <figure>
+              <div class="frame"><img id="img-gradcam" alt="" hidden><span class="frame-empty">Attention map</span></div>
+              <figcaption class="label-s muted">Attention</figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- 3 · News -->
+    <section id="news" class="news" aria-labelledby="news-title">
+      <div class="container">
+        <div class="news-header">
+          <div class="card-title">
+            <p class="overline">3 · In the news</p>
+            <h2 class="heading-l" id="news-title">Related coverage</h2>
+            <p class="body-m muted" id="news-sub">Recent reporting on natural disasters. Classify an image to focus on its category.</p>
+          </div>
+          <div class="chips" role="radiogroup" aria-label="Filter news by category" id="chips">
+            <button class="chip" role="radio" data-category="all" aria-checked="true">All</button>
+            <button class="chip" role="radio" data-category="cyclone" aria-checked="false">Cyclone</button>
+            <button class="chip" role="radio" data-category="earthquake" aria-checked="false">Earthquake</button>
+            <button class="chip" role="radio" data-category="flood" aria-checked="false">Flood</button>
+            <button class="chip" role="radio" data-category="wildfire" aria-checked="false">Wildfire</button>
+          </div>
+        </div>
+        <div class="news-grid" id="news-grid" aria-busy="true"></div>
+        <p class="news-provider label-s subtle" id="news-provider"></p>
+      </div>
+    </section>
+
+    <!-- About -->
+    <section id="about" class="about container" aria-labelledby="about-title">
+      <div class="card-title">
+        <p class="overline">About the model</p>
+        <h2 class="heading-l" id="about-title">How predictions are made</h2>
+      </div>
+      <dl class="facts">
+        <div><dt class="label-s subtle">Architecture</dt><dd class="body-m">ResNet-50 pretrained on ImageNet with a dropout + linear head for four classes.</dd></div>
+        <div><dt class="label-s subtle">Training</dt><dd class="body-m">Five epochs on the head, then full fine-tuning at a lower learning rate.</dd></div>
+        <div><dt class="label-s subtle">Explainability</dt><dd class="body-m">Grad-CAM on the final residual block highlights the regions that drove the decision.</dd></div>
+        <div><dt class="label-s subtle">Limits</dt><dd class="body-m">Earthquake damage is visually subtle and is the most frequently confused class.</dd></div>
+      </dl>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span class="label-s subtle">Disaster Lens · ResNet-50 fine-tuned on the Cyclone / Earthquake / Flood / Wildfire dataset</span>
+      <span class="label-s subtle" id="footer-provider">News via NewsAPI or GDELT</span>
+    </div>
+  </footer>
+
+  <template id="news-card-tpl">
+    <a class="news-card" target="_blank" rel="noopener noreferrer">
+      <div class="news-image" hidden><img alt="" loading="lazy" referrerpolicy="no-referrer"></div>
+      <div class="news-body">
+        <div class="news-meta">
+          <span class="badge"><span class="dot" aria-hidden="true"></span><span class="badge-label"></span></span>
+          <span class="label-s subtle news-source"></span>
+        </div>
+        <h3 class="heading-m news-title"></h3>
+        <p class="body-m muted news-summary"></p>
+        <span class="label-m accent news-link">Read article →</span>
+      </div>
+    </a>
+  </template>
+
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

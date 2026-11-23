@@ -96,8 +96,9 @@ def load_data(train_dir: str, test_dir: str, batch_size: int = 32):
 
 
 # ── Model ──────────────────────────────────────────────────────────────────────
-def build_model(num_classes: int, freeze_backbone: bool = True):
-    model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
+def build_model(num_classes: int, freeze_backbone: bool = True, pretrained: bool = True):
+    weights = models.ResNet50_Weights.IMAGENET1K_V1 if pretrained else None
+    model = models.resnet50(weights=weights)
     if freeze_backbone:
         for param in model.parameters():
             param.requires_grad = False
