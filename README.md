@@ -18,22 +18,27 @@ visualizations to explain model decisions.
 pip install -r requirements.txt
 ```
 
-### 2. Download the dataset
-**Dataset:** Cyclone Wildfire Flood Earthquake Database  
+### 2. Add your keys (news APIs, Kaggle)
+```bash
+cp .env.example .env
+```
+Open `.env` and fill in whichever keys you have; each line in `.env.example` says where to get it.
+`.env` is git-ignored, so keys stay on your machine. The server and the download script read it
+automatically. Keys already set in the environment (for example Codespaces secrets) take precedence.
+
+### 3. Download the dataset
+**Dataset:** Cyclone Wildfire Flood Earthquake Database
 **Kaggle URL:** https://www.kaggle.com/datasets/mikolajbabula/disaster-images-dataset-cnn-model
 
-**Option A – Kaggle CLI (recommended)**
+With `KAGGLE_USERNAME` and `KAGGLE_KEY` in `.env`:
 ```bash
-# First-time setup: place your kaggle.json API key in ~/.kaggle/
-kaggle datasets download -d mikolajbabula/disaster-images-dataset-cnn-model
-unzip disaster-images-dataset-cnn-model.zip -d data/
+python scripts/download_data.py
 ```
+It downloads and unzips into `data/` and prints the exact `train.py` command for the folders it finds.
 
-**Option B – Manual**
-1. Sign in to Kaggle, go to the dataset URL above, click Download.
-2. Unzip into the `data/` folder.
+**Manual alternative:** sign in to Kaggle, download the dataset from the URL above, and unzip it into `data/`.
 
-### 3. Verify folder structure
+### 4. Verify folder structure
 ```
 data/
 ├── train/
@@ -68,6 +73,70 @@ python train.py --epochs 20 --batch-size 16 --lr 0.001 --data-dir data/
 ### Evaluate a saved checkpoint (skip training)
 ```bash
 python train.py --eval-only --checkpoint best_model.pth
+```
+
+---
+
+## Web App — OrbitWatch
+
+A calm, single-page interface for the classifier with a related-news feed.
+The design lives in Figma: https://www.figma.com/design/GJHwVd8FZcXvEcDm6sNXMc
+(tokens, components and the desktop screen; CSS custom properties in
+`app/static/styles.css` mirror the Figma variables one-to-one).
+
+- **Classify** – drag & drop or choose a photo; get the predicted class, per-class
+  probabilities and a Grad-CAM attention map next to the crop the model saw.
+- **Related news** – recent coverage filtered by category. After a prediction the feed
+  switches to the predicted class automatically.
+- **Static by design** – no transitions or motion; light and dark themes follow the OS.
+
+### Run it
+```bash
+pip install -r requirements.txt
+python train.py                      # produces best_model.pth (skip if you already have one)
+uvicorn app.server:app --reload      # then open http://localhost:8000
+```
+Without a checkpoint the UI still loads and the news feed works; classification shows
+a notice explaining how to train a model.
+
+### News provider
+Providers are tried in order until one returns stories:
+
+| Order | Provider | Needs |
+|---|---|---|
+| 1 | [NewsAPI](https://newsapi.org) – many outlets, summaries, photos | `NEWS_API_KEY` |
+| 2 | [GDELT DOC 2.0](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) – many outlets, headlines | nothing |
+| 3 | [The Guardian Open Platform](https://open-platform.theguardian.com/) – summaries, photos | nothing (uses the public `test` key, or `GUARDIAN_API_KEY`) |
+
+Set `NEWS_PROVIDER=newsapi|gdelt|guardian` to use only one. Stories without a photo get the
+article's own preview image (`og:image`). Results are cached for 15 minutes (`NEWS_CACHE_TTL`),
+GDELT is paced to its one-request-per-5-seconds limit, and if every provider fails the last good
+stories are served.
+
+```bash
+export NEWS_API_KEY=your_key_here   # optional
+```
+
+### Configuration
+| Env var | Default | Purpose |
+|---|---|---|
+| `MODEL_CHECKPOINT` | `best_model.pth` | Path to trained weights |
+| `CLASS_NAMES` | `cyclone,earthquake,flood,wildfire` | Class order used in training (alphabetical folder order) |
+| `NEWS_API_KEY` | – | Use NewsAPI first |
+| `GUARDIAN_API_KEY` | `test` | Your own Guardian key (higher limits) |
+| `NEWS_PROVIDER` | – | Force one provider: `newsapi`, `gdelt` or `guardian` |
+
+### API
+| Endpoint | Description |
+|---|---|
+| `GET /api/health` | Model availability, classes, news provider |
+| `POST /api/predict` | Multipart `file` → label, confidence, probabilities, Grad-CAM (data URLs) |
+| `GET /api/news?category=flood&limit=9` | Normalised articles: title, summary, url, source, published_at, image, category |
+| `GET /api/docs` | Interactive OpenAPI docs |
+
+### Tests
+```bash
+python -m pytest tests
 ```
 
 ---
