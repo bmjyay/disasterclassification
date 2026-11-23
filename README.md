@@ -18,22 +18,27 @@ visualizations to explain model decisions.
 pip install -r requirements.txt
 ```
 
-### 2. Download the dataset
-**Dataset:** Cyclone Wildfire Flood Earthquake Database  
+### 2. Add your keys (news APIs, Kaggle)
+```bash
+cp .env.example .env
+```
+Open `.env` and fill in whichever keys you have; each line in `.env.example` says where to get it.
+`.env` is git-ignored, so keys stay on your machine. The server and the download script read it
+automatically. Keys already set in the environment (for example Codespaces secrets) take precedence.
+
+### 3. Download the dataset
+**Dataset:** Cyclone Wildfire Flood Earthquake Database
 **Kaggle URL:** https://www.kaggle.com/datasets/mikolajbabula/disaster-images-dataset-cnn-model
 
-**Option A – Kaggle CLI (recommended)**
+With `KAGGLE_USERNAME` and `KAGGLE_KEY` in `.env`:
 ```bash
-# First-time setup: place your kaggle.json API key in ~/.kaggle/
-kaggle datasets download -d mikolajbabula/disaster-images-dataset-cnn-model
-unzip disaster-images-dataset-cnn-model.zip -d data/
+python scripts/download_data.py
 ```
+It downloads and unzips into `data/` and prints the exact `train.py` command for the folders it finds.
 
-**Option B – Manual**
-1. Sign in to Kaggle, go to the dataset URL above, click Download.
-2. Unzip into the `data/` folder.
+**Manual alternative:** sign in to Kaggle, download the dataset from the URL above, and unzip it into `data/`.
 
-### 3. Verify folder structure
+### 4. Verify folder structure
 ```
 data/
 ├── train/

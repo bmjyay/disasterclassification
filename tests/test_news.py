@@ -152,3 +152,24 @@ def test_preview_image_parses_og_tag(monkeypatch):
     monkeypatch.setattr(news.urllib.request, "urlopen", lambda req, timeout: Resp())
     news._image_cache.clear()
     assert REAL_PREVIEW("https://site.example/story") == "https://site.example/img/p.jpg"
+
+
+def test_env_file_loader(tmp_path, monkeypatch):
+    from app.config import load_env
+    env = tmp_path / ".env"
+    env.write_text(
+        "# comment\nNEWS_API_KEY=abc123\nGUARDIAN_API_KEY=\"quoted key\"\n"
+        "export KAGGLE_USERNAME=someone  # trailing note\nEMPTY=\nKAGGLE_KEY=from-file\n"
+    )
+    for k in ("NEWS_API_KEY", "GUARDIAN_API_KEY", "KAGGLE_USERNAME", "EMPTY"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("KAGGLE_KEY", "already-set")  # real env wins over the file
+    loaded = load_env(env)
+    import os
+    assert os.environ["NEWS_API_KEY"] == "abc123"
+    assert os.environ["GUARDIAN_API_KEY"] == "quoted key"
+    assert os.environ["KAGGLE_USERNAME"] == "someone"
+    assert os.environ["KAGGLE_KEY"] == "already-set"
+    assert "EMPTY" not in os.environ and "KAGGLE_KEY" not in loaded
+    for k in ("NEWS_API_KEY", "GUARDIAN_API_KEY", "KAGGLE_USERNAME"):
+        monkeypatch.delenv(k, raising=False)

@@ -3,3 +3,7 @@ __pycache__/
 .pytest_cache/
 data/
 *.pth
+
+# secrets: keep real keys in .env (see .env.example)
+.env
+kaggle.json

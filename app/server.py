@@ -8,6 +8,7 @@ then open http://localhost:8000
 from __future__ import annotations
 
 import io
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
@@ -15,8 +16,12 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, UnidentifiedImageError
 
-from .model import Classifier, ModelUnavailable
-from .news import CATEGORIES, NewsError, NewsService
+from .config import load_env
+
+load_env()  # read .env before anything below looks at settings
+
+from .model import Classifier, ModelUnavailable  # noqa: E402
+from .news import CATEGORIES, NewsError, NewsService  # noqa: E402
 
 STATIC = Path(__file__).parent / "static"
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -32,6 +37,9 @@ def health():
         "model_ready": classifier.available,
         "classes": classifier.classes,
         "news_provider": news.provider,
+        "news_chain": news.chain,
+        # which keys are configured (never the values)
+        "keys": {k: bool(os.environ.get(k)) for k in ("NEWS_API_KEY", "GUARDIAN_API_KEY", "KAGGLE_USERNAME", "KAGGLE_KEY")},
     }
 
 
