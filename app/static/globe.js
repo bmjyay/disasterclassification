@@ -156,13 +156,6 @@
         return [x1, Y * cp - z1 * sp, Y * sp + z1 * cp];
       };
 
-      // soft halo
-      const g = ctx.createRadialGradient(cx, cy, R * 0.95, cx, cy, R * 1.35);
-      g.addColorStop(0, "rgba(190, 215, 214, 0.07)");
-      g.addColorStop(1, "rgba(190, 215, 214, 0)");
-      ctx.fillStyle = g;
-      ctx.fillRect(cx - R * 1.4, cy - R * 1.4, R * 2.8, R * 2.8);
-
       // orbits (hidden where they pass behind Earth)
       ctx.lineWidth = 1;
       ctx.strokeStyle = "rgba(214, 226, 225, 0.11)";
@@ -211,23 +204,23 @@
         if (z <= 0.05) continue;
         const sx = cx + x * R, sy = cy - y * R;
         const active = hs.id === this.activeHotspot;
-        ctx.strokeStyle = active ? "rgba(233, 166, 90, 0.95)" : "rgba(222, 232, 231, 0.45)";
-        ctx.fillStyle = active ? "#E9A65A" : "rgba(222, 232, 231, 0.7)";
+        ctx.strokeStyle = active ? "rgba(222, 232, 231, 0.95)" : "rgba(222, 232, 231, 0.4)";
+        ctx.fillStyle = active ? "#F2F5F4" : "rgba(222, 232, 231, 0.6)";
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.arc(sx, sy, active ? 9 : 5, 0, Math.PI * 2); ctx.stroke();
         ctx.beginPath(); ctx.arc(sx, sy, 2, 0, Math.PI * 2); ctx.fill();
         if (active) {
           ctx.beginPath(); ctx.arc(sx, sy, 17, 0, Math.PI * 2);
-          ctx.strokeStyle = "rgba(233, 166, 90, 0.35)"; ctx.stroke();
+          ctx.strokeStyle = "rgba(222, 232, 231, 0.25)"; ctx.stroke();
           ctx.font = '500 11px "IBM Plex Mono", ui-monospace, monospace';
           const coord = formatCoord(hs.lat, hs.lon);
           const bw = Math.max(ctx.measureText(hs.label.toUpperCase()).width, ctx.measureText(coord).width) + 16;
           ctx.fillStyle = "rgba(5, 6, 7, 0.82)";
           ctx.fillRect(sx + 16, sy - 17, bw, 34);
-          ctx.strokeStyle = "rgba(233, 166, 90, 0.45)";
+          ctx.strokeStyle = "rgba(222, 232, 231, 0.35)";
           ctx.strokeRect(sx + 16.5, sy - 16.5, bw - 1, 33);
           ctx.beginPath(); ctx.moveTo(sx + 9, sy); ctx.lineTo(sx + 16, sy); ctx.stroke();
-          ctx.fillStyle = "rgba(233, 166, 90, 0.95)";
+          ctx.fillStyle = "rgba(242, 245, 244, 0.95)";
           ctx.fillText(hs.label.toUpperCase(), sx + 24, sy - 4);
           ctx.fillStyle = "rgba(222, 232, 231, 0.6)";
           ctx.fillText(coord, sx + 24, sy + 11);
@@ -239,7 +232,7 @@
         const [x, y, z] = proj(...toWorld(this.selected.lat, this.selected.lon));
         if (z > 0) {
           const sx = cx + x * R, sy = cy - y * R;
-          ctx.strokeStyle = "rgba(233, 166, 90, 0.9)";
+          ctx.strokeStyle = "rgba(242, 245, 244, 0.9)";
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(sx - 14, sy); ctx.lineTo(sx - 5, sy); ctx.moveTo(sx + 5, sy); ctx.lineTo(sx + 14, sy);
