@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,46 +8,93 @@
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-  <a class="skip-link" href="#classify">Skip to content</a>
+  <a class="skip-link" href="#classify">Skip to the classifier</a>
 
-  <header class="site-header">
-    <div class="container header-inner">
-      <a class="brand" href="/" aria-label="Disaster Lens home">
-        <svg class="brand-mark" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
-          <rect width="28" height="28" rx="7" fill="var(--accent)"/>
-          <circle cx="14" cy="14" r="6" fill="none" stroke="var(--on-accent)" stroke-width="1.6"/>
-          <circle cx="14" cy="14" r="1.8" fill="var(--on-accent)"/>
-          <path d="M14 4.5v3M14 20.5v3M4.5 14h3M20.5 14h3" stroke="var(--on-accent)" stroke-width="1.6" stroke-linecap="round"/>
+  <header class="site-header" id="site-header">
+    <div class="header-inner">
+      <a class="brand" href="#top" aria-label="Disaster Lens, back to the cover">
+        <svg class="brand-mark" width="22" height="22" viewBox="0 0 28 28" aria-hidden="true">
+          <circle cx="14" cy="14" r="9" fill="none" stroke="currentColor" stroke-width="1.2"/>
+          <ellipse cx="14" cy="14" rx="13" ry="4.5" fill="none" stroke="currentColor" stroke-width="0.9" opacity="0.6" transform="rotate(-24 14 14)"/>
+          <circle cx="14" cy="14" r="1.6" fill="currentColor"/>
         </svg>
         <span class="brand-name">Disaster Lens</span>
       </a>
       <nav class="nav" aria-label="Primary">
-        <a href="#classify" aria-current="true">Classify</a>
-        <a href="#news">News</a>
-        <a href="#about">About the model</a>
+        <a href="#classify" data-section="classify">Classify</a>
+        <a href="#news" data-section="news">News</a>
+        <a href="#about" data-section="about">About the model</a>
       </nav>
       <span class="status-pill" id="status" data-state="loading">
-        <span class="dot" aria-hidden="true"></span><span class="status-label">Checking model…</span>
+        <span class="dot" aria-hidden="true"></span><span class="status-label">Checking model</span>
       </span>
     </div>
   </header>
 
   <main>
-    <section class="intro container">
-      <p class="overline accent">Aerial &amp; ground imagery · ResNet-50</p>
-      <h1 class="display">Understand a disaster scene at a glance.</h1>
-      <p class="lede">Upload a photograph to classify it as a cyclone, earthquake, flood or wildfire, see where the model looked, and read related coverage.</p>
+    <!-- Cover: scroll-driven tour of the dotted Earth -->
+    <section class="cover" id="top" aria-label="Introduction">
+      <div class="cover-stage">
+        <canvas class="globe" id="globe" aria-label="Dotted globe showing disaster hotspots. Drag to rotate, click to fly to a location." role="img"></canvas>
+
+        <div class="cover-copy">
+          <article class="chapter" data-chapter="0" data-lat="18" data-lon="18">
+            <p class="overline">Aerial &amp; satellite calamity detection</p>
+            <p class="cover-lead">Scroll to follow the satellites that watch for cyclones, earthquakes, floods and wildfires, and see how a ResNet-50 classifier turns their imagery into an answer.</p>
+            <p class="cover-hint">
+              <svg width="16" height="26" viewBox="0 0 16 26" aria-hidden="true"><rect x="0.6" y="0.6" width="14.8" height="24.8" rx="7.4" fill="none" stroke="currentColor" stroke-width="1"/><line x1="8" y1="5" x2="8" y2="9" stroke="currentColor" stroke-width="1"/></svg>
+              <span class="hint-text">Scroll to begin, or click anywhere on Earth to fly there</span>
+            </p>
+          </article>
+          <article class="chapter" data-chapter="1" data-hotspot="cyclone" data-lat="17.5" data-lon="88.5" hidden>
+            <p class="overline"><span class="index">01</span> Cyclone · Bay of Bengal</p>
+            <p class="cover-lead">Geostationary weather satellites image the Bay of Bengal every ten minutes. Spiralling cloud bands around a clear eye are the signature the model learns to recognise.</p>
+            <p class="readout mono">17.5°N  88.5°E · Meteosat / INSAT</p>
+          </article>
+          <article class="chapter" data-chapter="2" data-hotspot="earthquake" data-lat="37.2" data-lon="37" hidden>
+            <p class="overline"><span class="index">02</span> Earthquake · Kahramanmaraş</p>
+            <p class="cover-lead">After an earthquake, damage hides in texture: collapsed roofs and rubble fields. It is the subtlest class, and the one most often confused with the others.</p>
+            <p class="readout mono">37.2°N  37.0°E · WorldView / Pléiades</p>
+          </article>
+          <article class="chapter" data-chapter="3" data-hotspot="flood" data-lat="26.5" data-lon="68" hidden>
+            <p class="overline"><span class="index">03</span> Flood · Indus basin</p>
+            <p class="cover-lead">Floodwater spreads across farmland in flat, dark sheets. Radar satellites see it through cloud, so responders can map who is cut off within hours.</p>
+            <p class="readout mono">26.5°N  68.0°E · Sentinel-1 SAR</p>
+          </article>
+          <article class="chapter" data-chapter="4" data-hotspot="wildfire" data-lat="39.8" data-lon="-121.4" hidden>
+            <p class="overline"><span class="index">04</span> Wildfire · Sierra Nevada</p>
+            <p class="cover-lead">Smoke plumes, active fire fronts and blackened burn scars. Thermal sensors flag new fires; imagery like this confirms what is burning and where it is heading.</p>
+            <p class="readout mono">39.8°N  121.4°W · Landsat 9 / VIIRS</p>
+          </article>
+          <article class="chapter" data-chapter="5" data-lat="10" data-lon="40" hidden>
+            <p class="overline"><span class="index">05</span> Your turn</p>
+            <p class="cover-lead">Bring an aerial or ground photograph. The model names the calamity, shows where it looked, and surfaces the latest reporting so you can follow the response.</p>
+            <a class="btn btn-box" href="#classify">Classify an image</a>
+          </article>
+        </div>
+
+        <ol class="chapter-ticks" aria-hidden="true">
+          <li></li><li></li><li></li><li></li><li></li><li></li>
+        </ol>
+        <p class="selection mono" id="selection" aria-live="polite" hidden></p>
+      </div>
     </section>
 
-    <section id="classify" class="workspace container" aria-label="Classifier">
+    <section id="classify" class="section container" aria-labelledby="classify-title">
+      <div class="section-head">
+        <p class="overline">Classify</p>
+        <h2 class="display" id="classify-title">Read a scene from above.</h2>
+        <p class="lede">Upload a photograph to classify it as a cyclone, earthquake, flood or wildfire, and see where the model looked.</p>
+      </div>
+      <div class="workspace">
       <!-- 1 · Image -->
       <form class="card" id="upload-form" novalidate>
         <div class="card-title">
-          <p class="overline">1 · Image</p>
+          <p class="overline"><span class="index">01</span> Image</p>
           <h2 class="heading-l">Add a photograph</h2>
         </div>
 
@@ -59,7 +106,7 @@
             </svg>
             <span class="label-m">Drop an aerial or ground photo here</span>
             <span class="body-m subtle">JPG, PNG or WebP · up to 10 MB</span>
-            <span class="btn btn-secondary" aria-hidden="true">Choose file</span>
+            <span class="btn btn-box" aria-hidden="true">Choose file</span>
           </span>
           <span class="dropzone-preview" id="dropzone-preview" hidden>
             <img id="preview-img" alt="Selected image preview">
@@ -79,7 +126,7 @@
       <!-- 2 · Prediction -->
       <section class="card result" id="result" aria-live="polite" data-state="empty">
         <div class="card-title">
-          <p class="overline">2 · Prediction</p>
+          <p class="overline"><span class="index">02</span> Prediction</p>
           <div class="headline">
             <h2 class="display" id="pred-label">—</h2>
             <span class="mono-m muted" id="pred-confidence">Awaiting an image</span>
@@ -97,7 +144,7 @@
         <div class="attention">
           <div class="attention-header">
             <span class="label-m">Where the model looked</span>
-            <span class="label-s subtle">Grad-CAM · layer4</span>
+            <span class="mono subtle">Grad-CAM · layer4</span>
           </div>
           <div class="attention-images">
             <figure>
@@ -111,6 +158,7 @@
           </div>
         </div>
       </section>
+      </div>
     </section>
 
     <!-- 3 · News -->
@@ -118,7 +166,7 @@
       <div class="container">
         <div class="news-header">
           <div class="card-title">
-            <p class="overline">3 · In the news</p>
+            <p class="overline">In the news</p>
             <h2 class="heading-l" id="news-title">Related coverage</h2>
             <p class="body-m muted" id="news-sub">Recent reporting on natural disasters. Classify an image to focus on its category.</p>
           </div>
@@ -172,6 +220,7 @@
     </a>
   </template>
 
+  <script src="/static/globe.js" defer></script>
   <script src="/static/app.js" defer></script>
 </body>
 </html>

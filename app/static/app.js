@@ -341,7 +341,87 @@
     setNewsCategory(next.dataset.category);
   });
 
+  // ── Cover: globe + scroll chapters ───────────────────────
+  function initCover() {
+    const cover = $("top");
+    const canvas = $("globe");
+    if (!cover || !canvas || !window.DisasterGlobe) return;
+    const { Globe, formatCoord, wrapLon } = window.DisasterGlobe;
+    const chapters = [...cover.querySelectorAll(".chapter")];
+    const ticks = [...cover.querySelectorAll(".chapter-ticks li")];
+    const selection = $("selection");
+    const stops = chapters.map((c) => ({ lat: +c.dataset.lat, lon: +c.dataset.lon, hotspot: c.dataset.hotspot }));
+
+    if (window.matchMedia("(hover: none)").matches) {
+      const hint = cover.querySelector(".hint-text");
+      if (hint) hint.textContent = "Scroll to begin, or tap Earth to fly there";
+    }
+
+    const globe = new Globe(canvas, {
+      onSelect: ({ lat, lon }) => {
+        selection.hidden = false;
+        selection.textContent = `Target · ${formatCoord(lat, lon)}`;
+      },
+    });
+    globe.hotspots = chapters
+      .filter((c) => c.dataset.hotspot)
+      .map((c) => ({ id: c.dataset.hotspot, label: c.dataset.hotspot, lat: +c.dataset.lat, lon: +c.dataset.lon }));
+    globe.load("/static/land-mask.bin").catch(() => canvas.remove());
+
+    let current = -1;
+    let lastProgress = -1;
+    function onScroll() {
+      const rect = cover.getBoundingClientRect();
+      const span = cover.offsetHeight - window.innerHeight;
+      const p = Math.max(0, Math.min(1, -rect.top / span)) * (stops.length - 1);
+      if (p === lastProgress) return;
+      lastProgress = p;
+
+      const i = Math.min(stops.length - 2, Math.floor(p));
+      const f = window.DisasterGlobe.ease(Math.min(1, Math.max(0, p - i)));
+      const a = stops[i], b = stops[i + 1];
+      globe.setView(a.lat + (b.lat - a.lat) * f, a.lon + wrapLon(b.lon - a.lon) * f);
+
+      const idx = Math.round(p);
+      if (idx !== current) {
+        current = idx;
+        chapters.forEach((c, k) => (c.hidden = k !== idx));
+        ticks.forEach((t, k) => (t.dataset.active = String(k === idx)));
+        globe.activeHotspot = stops[idx].hotspot || null;
+        globe.draw();
+      }
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    onScroll();
+  }
+
+  // ── Header: solid after the cover, tab follows the visible section ──
+  function initHeader() {
+    const header = $("site-header");
+    const cover = $("top");
+    const links = [...document.querySelectorAll(".nav a[data-section]")];
+    const sections = links.map((a) => document.getElementById(a.dataset.section));
+    function update() {
+      const coverEnd = cover ? cover.offsetTop + cover.offsetHeight - window.innerHeight : 0;
+      header.dataset.solid = String(window.scrollY > coverEnd - 1);
+      const probe = window.scrollY + window.innerHeight * 0.35;
+      let active = null;
+      sections.forEach((s, i) => { if (s && s.offsetTop <= probe) active = i; });
+      if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 2) active = sections.length - 1;
+      links.forEach((a, i) => {
+        if (i === active) a.setAttribute("aria-current", "true");
+        else a.removeAttribute("aria-current");
+      });
+    }
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    update();
+  }
+
   // ── Init ──────────────────────────────────────────────────
+  initCover();
+  initHeader();
   resetResult();
   checkHealth();
   setNewsCategory("all");
