@@ -37,6 +37,10 @@
     newsProvider: $("news-provider"),
     storyCount: $("story-count"),
     radarTpl: $("radar-item-tpl"),
+    storyTpl: $("story-card-tpl"),
+    more: $("more-stories"),
+    moreGrid: $("more-grid"),
+    moreCount: $("more-count"),
     widget: $("float-widget"),
     widgetThumb: $("float-thumb"),
     widgetKicker: $("float-kicker"),
@@ -361,11 +365,38 @@
 
     els.grid.replaceChildren(copy, media, radar);
     els.grid.setAttribute("aria-busy", "false");
+    renderMore(rest.slice(3), category);
   }
+
+  // Remaining stories as photo cards under the band.
+  function renderMore(items, category) {
+    const cards = items.slice(0, 6).map((item) => {
+      const node = els.storyTpl.content.firstElementChild.cloneNode(true);
+      node.href = safeUrl(item.url);
+      const cls = item.category || (category !== "all" ? category : null);
+      node.querySelector(".tile").dataset.class = cls || "flood";
+      const img = safeUrl(item.image);
+      if (img) {
+        const im = node.querySelector("img");
+        im.src = img; im.hidden = false;
+        im.addEventListener("error", () => im.remove(), { once: true });
+      }
+      node.querySelector(".story-kicker").textContent = [cls ? cls + "s" : "News", item.source].filter(Boolean).join(" / ");
+      node.querySelector(".story-time").textContent = relativeTime(item.published_at);
+      node.querySelector(".story-title").textContent = item.title;
+      node.querySelector(".story-sum").textContent = item.summary || "";
+      return node;
+    });
+    els.moreGrid.replaceChildren(...cards);
+    els.moreCount.textContent = cards.length ? `${String(cards.length).padStart(2, "0")} more` : "";
+    els.more.hidden = !cards.length;
+  }
+  const PROVIDER_NAMES = { newsapi: "NewsAPI", gdelt: "GDELT", guardian: "The Guardian" };
 
   async function loadNews(category) {
     const req = ++newsRequest;
     renderSkeleton();
+    els.more.hidden = true;
     try {
       const res = await fetch(`/api/news?category=${encodeURIComponent(category)}&limit=9`);
       const data = await res.json().catch(() => ({}));
@@ -374,7 +405,7 @@
       const articles = data.articles || [];
       renderJournal(articles, category);
       if (category === "all") els.storyCount.textContent = String(articles.length).padStart(2, "0");
-      const name = data.provider === "newsapi" ? "NewsAPI" : "GDELT";
+      const name = PROVIDER_NAMES[data.provider] || data.provider;
       els.newsProvider.textContent = data.stale ? `Via ${name} · saved stories` : `Via ${name}`;
     } catch {
       if (req !== newsRequest) return;

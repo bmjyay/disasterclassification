@@ -95,22 +95,31 @@ Without a checkpoint the UI still loads and the news feed works; classification 
 a notice explaining how to train a model.
 
 ### News provider
-| Setting | Provider |
-|---|---|
-| `NEWS_API_KEY` set | [NewsAPI](https://newsapi.org) `/v2/everything` (titles + descriptions + images) |
-| not set (default) | [GDELT DOC 2.0](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) – free, no key |
+Providers are tried in order until one returns stories:
+
+| Order | Provider | Needs |
+|---|---|---|
+| 1 | [NewsAPI](https://newsapi.org) – many outlets, summaries, photos | `NEWS_API_KEY` |
+| 2 | [GDELT DOC 2.0](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) – many outlets, headlines | nothing |
+| 3 | [The Guardian Open Platform](https://open-platform.theguardian.com/) – summaries, photos | nothing (uses the public `test` key, or `GUARDIAN_API_KEY`) |
+
+Set `NEWS_PROVIDER=newsapi|gdelt|guardian` to use only one. Stories without a photo get the
+article's own preview image (`og:image`). Results are cached for 15 minutes (`NEWS_CACHE_TTL`),
+GDELT is paced to its one-request-per-5-seconds limit, and if every provider fails the last good
+stories are served.
 
 ```bash
 export NEWS_API_KEY=your_key_here   # optional
 ```
-Results are cached in memory for 15 minutes (`NEWS_CACHE_TTL` seconds to change).
 
 ### Configuration
 | Env var | Default | Purpose |
 |---|---|---|
 | `MODEL_CHECKPOINT` | `best_model.pth` | Path to trained weights |
 | `CLASS_NAMES` | `cyclone,earthquake,flood,wildfire` | Class order used in training (alphabetical folder order) |
-| `NEWS_API_KEY` | – | Use NewsAPI instead of GDELT |
+| `NEWS_API_KEY` | – | Use NewsAPI first |
+| `GUARDIAN_API_KEY` | `test` | Your own Guardian key (higher limits) |
+| `NEWS_PROVIDER` | – | Force one provider: `newsapi`, `gdelt` or `guardian` |
 
 ### API
 | Endpoint | Description |

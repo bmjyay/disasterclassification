@@ -1,19 +1,28 @@
 """Related-news provider.
 
-Uses NewsAPI (https://newsapi.org) when NEWS_API_KEY is set, otherwise falls back
-to the free, key-less GDELT DOC 2.0 API. Results are normalised to one shape and
-cached in memory so the page stays fast and well within provider rate limits.
+Providers are tried in order until one returns stories:
+  1. NewsAPI (https://newsapi.org), when NEWS_API_KEY is set
+  2. GDELT DOC 2.0, free and key-less, many outlets
+  3. The Guardian Open Platform, using GUARDIAN_API_KEY or the public "test" key;
+     reliable, with photos and standfirsts
+Set NEWS_PROVIDER to "newsapi", "gdelt" or "guardian" to use only that one.
+
+Stories without a photo get one from the article's own preview image (og:image).
+Results are normalised to one shape and cached in memory.
 """
 
 from __future__ import annotations
 
+import html
 import json
+import re
 import os
 import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 CATEGORIES = ("cyclone", "earthquake", "flood", "wildfire")
@@ -180,56 +189,159 @@ def _dedupe(items: list[dict], limit: int) -> list[dict]:
     return out
 
 
+_TAG = re.compile(r"<[^>]+>")
+
+
+def _strip_html(text: str) -> str:
+    return html.unescape(_TAG.sub("", text or "")).strip()
+
+
+def _fetch_guardian(category: str | None, limit: int) -> list[dict]:
+    params = {
+        "q": " OR ".join(f'"{t}"' if " " in t else t for t in _terms_for(category)),
+        "query-fields": "headline,standfirst",
+        "order-by": "newest",
+        "page-size": str(min(limit * 2, 50)),
+        "show-fields": "thumbnail,trailText",
+        "api-key": os.environ.get("GUARDIAN_API_KEY", "test"),
+    }
+    url = "https://content.guardianapis.com/search?" + urllib.parse.urlencode(params)
+    data = _get_json(url).get("response", {})
+    if data.get("status") != "ok":
+        raise NewsError(data.get("message", "Guardian API error"))
+    out = []
+    for a in data.get("results", []):
+        title = (a.get("webTitle") or "").strip()
+        if not title or not a.get("webUrl"):
+            continue
+        fields = a.get("fields") or {}
+        summary = _strip_html(fields.get("trailText", ""))
+        out.append({
+            "title": title,
+            "summary": summary,
+            "url": a["webUrl"],
+            "source": "The Guardian",
+            "published_at": a.get("webPublicationDate"),
+            "image": fields.get("thumbnail") or None,
+            "category": _classify(f"{title} {summary}", category),
+        })
+    return out
+
+
+# ── Preview images ─────────────────────────────────────────────────────────────
+_OG = re.compile(
+    r"""<meta[^>]+(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image(?::src)?)["'][^>]*>""", re.I
+)
+_CONTENT = re.compile(r"""content=["']([^"']+)["']""", re.I)
+_image_cache: dict[str, str | None] = {}
+
+
+def _preview_image(page_url: str) -> str | None:
+    """Return the article's og:image / twitter:image, or None. Reads at most 300 KB."""
+    if page_url in _image_cache:
+        return _image_cache[page_url]
+    found = None
+    try:
+        req = urllib.request.Request(page_url, headers={"User-Agent": "Mozilla/5.0 (compatible; OrbitWatch/1.0)"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            if "html" in resp.headers.get("Content-Type", "html"):
+                head = resp.read(300_000).decode("utf-8", errors="replace")
+                for tag in _OG.findall(head):
+                    m = _CONTENT.search(tag)
+                    if m:
+                        candidate = urllib.parse.urljoin(page_url, html.unescape(m.group(1).strip()))
+                        if candidate.startswith(("http://", "https://")):
+                            found = candidate
+                            break
+    except Exception:
+        found = None
+    _image_cache[page_url] = found
+    return found
+
+
+def _fill_images(items: list[dict], max_lookups: int = 9) -> None:
+    missing = [it for it in items if not it.get("image")][:max_lookups]
+    if not missing:
+        return
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        for it, img in zip(missing, pool.map(lambda it: _preview_image(it["url"]), missing)):
+            it["image"] = img
+
+
+_FETCHERS = {
+    "newsapi": lambda cat, n: _fetch_newsapi(cat, n, os.environ["NEWS_API_KEY"]),
+    "gdelt": _fetch_gdelt,
+    "guardian": _fetch_guardian,
+}
+
+
 class NewsService:
-    def __init__(self):
+    def __init__(self, fill_images: bool = True):
         self._cache: dict[tuple, tuple[float, dict]] = {}
         self._lock = threading.Lock()
+        self._fill_images = fill_images
+
+    @property
+    def chain(self) -> list[str]:
+        forced = os.environ.get("NEWS_PROVIDER", "").lower()
+        if forced in _FETCHERS and (forced != "newsapi" or os.environ.get("NEWS_API_KEY")):
+            return [forced]
+        return (["newsapi"] if os.environ.get("NEWS_API_KEY") else []) + ["gdelt", "guardian"]
 
     @property
     def provider(self) -> str:
-        return "newsapi" if os.environ.get("NEWS_API_KEY") else "gdelt"
+        return self.chain[0]
 
     def get(self, category: str | None, limit: int = 9) -> dict:
         category = category if category in CATEGORIES else None
         limit = max(1, min(limit, 30))
-        key = (self.provider, category, limit)
+        key = (category, limit)
         now = time.time()
         with self._lock:
             hit = self._cache.get(key)
             if hit and now - hit[0] < CACHE_TTL:
                 return hit[1]
 
-        api_key = os.environ.get("NEWS_API_KEY")
-        try:
-            items = _fetch_newsapi(category, limit, api_key) if api_key else _fetch_gdelt(category, limit)
-        except NewsError:
-            fallback = self._fallback(category, limit)
-            if fallback is None:
-                raise
+        errors = []
+        for name in self.chain:
+            try:
+                items = _dedupe(_FETCHERS[name](category, limit), limit)
+            except NewsError as e:
+                errors.append(f"{name}: {e}")
+                continue
+            if not items:
+                errors.append(f"{name}: no results")
+                continue
+            if self._fill_images:
+                _fill_images(items)
+            result = {
+                "category": category or "all",
+                "provider": name,
+                "fetched_at": datetime.now(timezone.utc).isoformat(),
+                "articles": items,
+            }
+            with self._lock:
+                self._cache[key] = (now, result)
+            return result
+
+        fallback = self._fallback(category, limit)
+        if fallback is not None:
             return fallback
-        result = {
-            "category": category or "all",
-            "provider": self.provider,
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
-            "articles": _dedupe(items, limit),
-        }
-        with self._lock:
-            self._cache[key] = (now, result)
-        return result
+        raise NewsError("; ".join(errors) or "No news provider available")
 
     def _fallback(self, category: str | None, limit: int) -> dict | None:
-        """Serve the last good stories when the provider fails: same query first,
+        """Serve the last good stories when every provider fails: same query first,
         otherwise cached "all" stories filtered to the requested category."""
         with self._lock:
-            entries = [(k, v) for k, v in self._cache.items() if k[0] == self.provider]
-        same = [v for k, (_, v) in entries if k[1] == category]
+            entries = list(self._cache.items())
+        same = [v for k, (_, v) in entries if k[0] == category]
         if same:
             return {**same[0], "stale": True}
         if category:
-            pool = [a for k, (_, v) in entries if k[1] is None for a in v["articles"] if a.get("category") == category]
+            pool = [a for k, (_, v) in entries if k[0] is None for a in v["articles"] if a.get("category") == category]
             if pool:
                 return {
-                    "category": category, "provider": self.provider, "stale": True,
+                    "category": category, "provider": entries[0][1][1]["provider"], "stale": True,
                     "fetched_at": datetime.now(timezone.utc).isoformat(),
                     "articles": _dedupe(pool, limit),
                 }
